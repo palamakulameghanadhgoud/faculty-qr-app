@@ -3,8 +3,13 @@ import { Link } from "react-router-dom";
 import QrScanner from "qr-scanner";
 
 export default function StudentPage() {
-  const [studentId, setStudentId] = useState("");
-  const [studentName, setStudentName] = useState("");
+  // Authentication states
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginId, setLoginId] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [currentStudent, setCurrentStudent] = useState(null);
+
+  // Existing states
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +20,48 @@ export default function StudentPage() {
 
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
+
+  // Predefined student database (2410080001 to 2410080085)
+  const studentDatabase = {};
+  for (let i = 1; i <= 85; i++) {
+    const id = `2410080${i.toString().padStart(3, '0')}`;
+    studentDatabase[id] = {
+      id: id,
+      name: `Student ${i.toString().padStart(3, '0')}`, // You can customize names later
+      department: "AIDS",
+      year: "2024"
+    };
+  }
+
+  // Authentication functions
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const trimmedId = loginId.trim();
+    
+    if (!trimmedId) {
+      setLoginError("Please enter your Student ID");
+      return;
+    }
+
+    if (studentDatabase[trimmedId]) {
+      setCurrentStudent(studentDatabase[trimmedId]);
+      setIsLoggedIn(true);
+      setLoginError("");
+      setLoginId("");
+      console.log(`Student logged in: ${studentDatabase[trimmedId].name} (${trimmedId})`);
+    } else {
+      setLoginError("Invalid Student ID. Please check your ID and try again.");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setCurrentStudent(null);
+    setScannedCode("");
+    setMessage("");
+    setIsSuccess(false);
+    stopScanning();
+  };
 
   // Check if camera is available
   useEffect(() => {
@@ -32,7 +79,7 @@ export default function StudentPage() {
                            window.location.hostname === '127.0.0.1';
         
         if (!isSecureContext && !isLocalhost) {
-          setCameraError("Camera requires HTTPS connection for remote access. Use manual input below.");
+          setCameraError("Camera requires HTTPS connection for remote access.");
           return;
         }
 
@@ -82,18 +129,31 @@ export default function StudentPage() {
     checkCamera();
   }, []);
 
-  // Start QR Scanner
+  // Start QR Scanner with zoom functionality
   const startScanning = async () => {
     try {
       setCameraError("");
       setMessage("Starting camera...");
       setIsScanning(true);
 
+      // Wait for video element to be ready
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       if (!videoRef.current) {
         throw new Error("Video element not ready");
       }
 
-      // Create QR Scanner
+      // Ensure video element is properly mounted in DOM
+      if (!document.contains(videoRef.current)) {
+        throw new Error("Video element not in DOM");
+      }
+
+      // Set initial video properties to prevent undefined errors
+      videoRef.current.style.width = "100%";
+      videoRef.current.style.height = "240px";
+      videoRef.current.style.objectFit = "cover";
+
+      // Create QR Scanner with enhanced error handling
       qrScannerRef.current = new QrScanner(
         videoRef.current,
         (result) => {
@@ -108,23 +168,51 @@ export default function StudentPage() {
           highlightScanRegion: true,
           highlightCodeOutline: true,
           preferredCamera: "environment",
-          maxScansPerSecond: 5,
+          maxScansPerSecond: 3,
+          // Simplified scan region calculation
           calculateScanRegion: (video) => {
-            const size = Math.min(video.videoWidth, video.videoHeight);
-            const scanSize = Math.round(0.7 * size);
-            return {
-              x: Math.round((video.videoWidth - scanSize) / 2),
-              y: Math.round((video.videoHeight - scanSize) / 2),
-              width: scanSize,
-              height: scanSize,
-            };
-          },
+            try {
+              if (!video || !video.videoWidth || !video.videoHeight) {
+                return {
+                  x: 50,
+                  y: 50,
+                  width: 200,
+                  height: 200,
+                };
+              }
+              
+              const size = Math.min(video.videoWidth, video.videoHeight);
+              const scanSize = Math.round(0.6 * size);
+              return {
+                x: Math.round((video.videoWidth - scanSize) / 2),
+                y: Math.round((video.videoHeight - scanSize) / 2),
+                width: scanSize,
+                height: scanSize,
+              };
+            } catch (error) {
+              console.warn("Scan region calculation failed:", error);
+              return {
+                x: 50,
+                y: 50,
+                width: 200,
+                height: 200,
+              };
+            }
+          }
         }
       );
 
+      // Add error handler to QR scanner
+      qrScannerRef.current.onError = (error) => {
+        console.error("QR Scanner error:", error);
+        setCameraError(`Scanner error: ${error.message}`);
+        setIsScanning(false);
+      };
+
       // Start the scanner
       await qrScannerRef.current.start();
-      setMessage("Camera started. Point at QR code to scan.");
+      
+      setMessage("Camera started. Point at QR code to scan. Use zoom controls if needed.");
       console.log("QR Scanner started successfully");
 
     } catch (error) {
@@ -141,8 +229,10 @@ export default function StudentPage() {
         errorMessage += "Camera not supported. Try a different browser.";
       } else if (error.name === 'NotReadableError') {
         errorMessage += "Camera busy. Close other apps using camera.";
+      } else if (error.message.includes("Video element")) {
+        errorMessage += "Video element issue. Please try again in a moment.";
       } else {
-        errorMessage += `${error.message}. Try the manual input below.`;
+        errorMessage += `${error.message}. Please try again.`;
       }
 
       setCameraError(errorMessage);
@@ -150,54 +240,98 @@ export default function StudentPage() {
     }
   };
 
-  // Basic camera stream
-  const startBasicCamera = async () => {
+  // Enhanced zoom with better error handling
+  const handleZoom = async (zoomLevel) => {
     try {
-      console.log("Starting basic camera...");
-      setIsScanning(true);
-      setCameraError("");
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 640, min: 320 },
-          height: { ideal: 480, min: 240 },
-          facingMode: { ideal: 'environment' }
-        } 
-      });
-      
-      console.log("Got camera stream:", stream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        console.log("Video source set");
+      if (!videoRef.current || !videoRef.current.srcObject) {
+        console.warn("No video stream available for zoom");
+        setMessage("No camera active. Please start scanning first.");
+        return;
       }
+
+      const stream = videoRef.current.srcObject;
+      const tracks = stream.getVideoTracks();
       
-      setMessage("Basic camera started! You can manually enter QR codes below.");
+      if (tracks.length === 0) {
+        console.warn("No video tracks available");
+        setMessage("No camera stream available for zoom.");
+        return;
+      }
+
+      const track = tracks[0];
       
+      try {
+        const capabilities = track.getCapabilities();
+        
+        if (capabilities && capabilities.zoom) {
+          await track.applyConstraints({
+            advanced: [{ zoom: zoomLevel }]
+          });
+          console.log(`Hardware zoom set to: ${zoomLevel}`);
+          setMessage(`Zoom set to ${zoomLevel}x - Hardware zoom applied`);
+        } else {
+          // Fallback to CSS zoom
+          videoRef.current.style.transform = `scale(${zoomLevel})`;
+          videoRef.current.style.transformOrigin = 'center center';
+          console.log(`CSS zoom set to: ${zoomLevel}`);
+          setMessage(`Zoom set to ${zoomLevel}x - Software zoom applied`);
+        }
+      } catch (constraintError) {
+        console.warn("Hardware zoom failed, using CSS fallback:", constraintError);
+        // Fallback to CSS zoom
+        videoRef.current.style.transform = `scale(${zoomLevel})`;
+        videoRef.current.style.transformOrigin = 'center center';
+        setMessage(`Zoom set to ${zoomLevel}x - Software zoom applied`);
+      }
     } catch (error) {
-      console.error("Basic camera failed:", error);
-      setIsScanning(false);
-      setCameraError(`Basic camera failed: ${error.message}`);
+      console.error("Zoom error:", error);
+      setCameraError(`Zoom failed: ${error.message}`);
     }
   };
 
-  // Stop QR Scanner
+  // Enhanced stop scanning with cleanup
   const stopScanning = () => {
-    if (qrScannerRef.current) {
-      qrScannerRef.current.stop();
-      qrScannerRef.current.destroy();
-      qrScannerRef.current = null;
+    try {
+      // Stop QR scanner
+      if (qrScannerRef.current) {
+        try {
+          qrScannerRef.current.stop();
+          qrScannerRef.current.destroy();
+        } catch (error) {
+          console.warn("Error stopping QR scanner:", error);
+        }
+        qrScannerRef.current = null;
+      }
+      
+      // Stop camera stream
+      if (videoRef.current && videoRef.current.srcObject) {
+        try {
+          const stream = videoRef.current.srcObject;
+          stream.getTracks().forEach(track => {
+            try {
+              track.stop();
+            } catch (error) {
+              console.warn("Error stopping track:", error);
+            }
+          });
+          videoRef.current.srcObject = null;
+          
+          // Reset video styles
+          videoRef.current.style.transform = '';
+          videoRef.current.style.transformOrigin = '';
+        } catch (error) {
+          console.warn("Error cleaning up video:", error);
+        }
+      }
+      
+      setIsScanning(false);
+      setMessage("");
+      setCameraError("");
+      
+    } catch (error) {
+      console.error("Error in stopScanning:", error);
+      setIsScanning(false);
     }
-    
-    // Also stop any basic camera stream
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    
-    setIsScanning(false);
-    setMessage("");
   };
 
   // Submit attendance
@@ -205,7 +339,13 @@ export default function StudentPage() {
     e.preventDefault();
 
     if (!scannedCode) {
-      setMessage("Please scan a QR code first or enter it manually");
+      setMessage("Please scan a QR code first");
+      setIsSuccess(false);
+      return;
+    }
+
+    if (!currentStudent) {
+      setMessage("Error: No student logged in");
       setIsSuccess(false);
       return;
     }
@@ -214,8 +354,9 @@ export default function StudentPage() {
     setMessage("Submitting attendance...");
 
     try {
-      // Use environment variable for API base URL - Updated to use correct default
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+      // Use the correct API URL
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      console.log(`Attempting to connect to: ${API_BASE_URL}/validate`);
       
       const response = await fetch(`${API_BASE_URL}/validate`, {
         method: "POST",
@@ -224,27 +365,43 @@ export default function StudentPage() {
         },
         body: JSON.stringify({
           qr_code: scannedCode,
-          student_id: studentId.trim(),
-          student_name: studentName.trim(),
+          student_id: currentStudent.id,
+          student_name: currentStudent.name,
         }),
       });
 
+      console.log(`Response status: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (data.valid) {
         setIsSuccess(true);
         setMessage(data.message);
         setScannedCode("");
-        setStudentId("");
-        setStudentName("");
+        // Don't clear student info as they remain logged in
       } else {
         setIsSuccess(false);
         setMessage(data.message);
       }
     } catch (error) {
       setIsSuccess(false);
-      setMessage("Network error. Please check connection and try again.");
-      console.error("Validation error:", error);
+      console.error("Detailed validation error:", error);
+      
+      // More specific error messages
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setMessage("Cannot connect to server. Make sure the Flask API is running on port 5000.");
+      } else if (error.message.includes('CORS')) {
+        setMessage("CORS error. Check server configuration.");
+      } else if (error.message.includes('HTTP error')) {
+        setMessage(`Server error: ${error.message}. Check server logs.`);
+      } else {
+        setMessage("Network error. Please check connection and try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -292,76 +449,295 @@ export default function StudentPage() {
     }
   };
 
-  // Timer and QR code fetching logic
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [downloadReady, setDownloadReady] = useState(false);
-  const [qr, setQr] = useState(null);
+  // LOGIN SCREEN
+  if (!isLoggedIn) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          fontFamily: "Segoe UI, Arial, sans-serif",
+        }}
+      >
+        {/* Header */}
+        <header
+          style={{
+            width: "100vw",
+            background: "#1976d2",
+            color: "#fff",
+            padding: "0",
+            textAlign: "center",
+            boxShadow: "0 2px 16px rgba(25, 118, 210, 0.13)",
+            minHeight: 90,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <img
+            src="/Lg.png"
+            alt="KL University Logo"
+            style={{
+              height: 100,
+              marginLeft: 32,
+              marginRight: 24,
+              marginTop: 10,
+              marginBottom: 10,
+              background: "#fff",
+              borderRadius: 12,
+              boxShadow: "0 2px 8px rgba(25,118,210,0.08)",
+              objectFit: "contain",
+            }}
+          />
+          <div style={{ flex: 1, textAlign: "center" }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 44,
+                letterSpacing: 2,
+                fontWeight: 500,
+                textTransform: "uppercase",
+              }}
+            >
+              attendu
+            </h1>
+            <div
+              style={{
+                fontSize: 20,
+                letterSpacing: 1,
+                marginTop: 4,
+                fontWeight: 500,
+              }}
+            >
+              student login -{" "}
+              <span
+                style={{
+                  color: "#1976d2",
+                  background: "#fff",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  fontWeight: 700,
+                }}
+              >
+                KL University
+              </span>
+            </div>
+          </div>
+        </header>
 
-  useEffect(() => {
-    if (!running) return;
+        {/* Navigation */}
+        <nav
+          style={{
+            background: "#f5f5f5",
+            padding: "12px 0",
+            textAlign: "center",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+            width: "100%",
+            marginBottom: 20,
+          }}
+        >
+          <Link
+            to="/"
+            style={{
+              color: "#666",
+              textDecoration: "none",
+              margin: "0 16px",
+              fontWeight: 500,
+            }}
+          >
+            Home
+          </Link>
+          <Link
+            to="/faculty"
+            style={{
+              color: "#b71c1c",
+              textDecoration: "none",
+              margin: "0 16px",
+              fontWeight: 500,
+            }}
+          >
+            Faculty
+          </Link>
+          <Link
+            to="/student"
+            style={{
+              color: "#1976d2",
+              textDecoration: "none",
+              margin: "0 16px",
+              fontWeight: 600,
+            }}
+          >
+            Student
+          </Link>
+        </nav>
 
-    const countdown = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdown);
-          setRunning(false);
-          setDownloadReady(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+        {/* Main Login Content */}
+        <main
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100vw",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              boxShadow: "0 4px 32px rgba(25, 118, 210, 0.13)",
+              padding: "48px 32px",
+              minWidth: 380,
+              maxWidth: 420,
+              width: "100%",
+              textAlign: "center",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 64,
+                marginBottom: 20,
+                color: "#1976d2",
+              }}
+            >
+              🎓
+            </div>
 
-    const fetchQR = async () => {
-      try {
-        // Changed from localhost:5000 to localhost:3000
-        const res = await fetch("http://localhost:3000/qr");
-        const json = await res.json();
-        setQr(json);
-      } catch (err) {
-        console.error("Failed to fetch QR:", err);
-      }
-    };
+            <h2
+              style={{
+                color: "#1976d2",
+                marginBottom: 24,
+                fontWeight: 600,
+                fontSize: 24,
+              }}
+            >
+              Student Login
+            </h2>
 
-    fetchQR();
-    const qrInterval = setInterval(fetchQR, 3000);
+            <p
+              style={{
+                color: "#666",
+                marginBottom: 32,
+                fontSize: 16,
+                lineHeight: 1.5,
+              }}
+            >
+              Enter your Student ID to access the QR attendance system
+            </p>
 
-    return () => {
-      clearInterval(countdown);
-      clearInterval(qrInterval);
-    };
-  }, [running]);
+            <form onSubmit={handleLogin} style={{ textAlign: "left" }}>
+              <div style={{ marginBottom: 24 }}>
+                <label
+                  style={{
+                    display: "block",
+                    color: "#1976d2",
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  Student ID:
+                </label>
+                <input
+                  type="text"
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    border: "2px solid #bbdefb",
+                    borderRadius: 8,
+                    fontSize: 16,
+                    outline: "none",
+                    background: "#f3f9ff",
+                    transition: "border-color 0.2s",
+                  }}
+                  placeholder="Enter your student ID (e.g., 2410080001)"
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#1976d2";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#bbdefb";
+                  }}
+                />
+              </div>
 
-  const handleDownload = async () => {
-    try {
-      // Changed from localhost:5000 to localhost:3000
-      const response = await fetch("http://localhost:3000/download/excel");
-      
-      if (response.ok) {
-        // If the response is a file, download it
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        // If there's an error, handle JSON response
-        const data = await response.json();
-        console.error('Download failed:', data);
-        alert('Download failed: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Failed to download attendance file');
-    }
-  };
+              {loginError && (
+                <div
+                  style={{
+                    background: "#ffebee",
+                    border: "1px solid #f44336",
+                    borderRadius: 8,
+                    padding: "12px",
+                    marginBottom: 24,
+                    color: "#c62828",
+                    fontSize: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  <strong>⚠️ Login Failed:</strong><br />
+                  {loginError}
+                </div>
+              )}
 
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  background: "#1976d2",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "16px",
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(25, 118, 210, 0.3)",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.background = "#1565c0";
+                  e.target.style.transform = "translateY(-1px)";
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.background = "#1976d2";
+                  e.target.style.transform = "translateY(0)";
+                }}
+              >
+                🔑 Login to Attendance System
+              </button>
+            </form>
+
+            <div
+              style={{
+                marginTop: 32,
+                padding: "16px",
+                background: "#f3f9ff",
+                borderRadius: 8,
+                fontSize: 12,
+                color: "#1976d2",
+                textAlign: "left",
+              }}
+            >
+              <strong>📋 Valid Student IDs:</strong>
+              <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.4 }}>
+                • IDs range from <strong>2410080001</strong> to <strong>2410080085</strong><br />
+                • Contact faculty if your ID is not working<br />
+                • Make sure to enter the complete 10-digit ID<br />
+                • No spaces or special characters allowed
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // MAIN ATTENDANCE SCREEN (after login)
   return (
     <div
       style={{
@@ -438,7 +814,7 @@ export default function StudentPage() {
         </div>
       </header>
 
-      {/* Navigation */}
+      {/* Navigation with logout */}
       <nav
         style={{
           background: "#f5f5f5",
@@ -471,17 +847,30 @@ export default function StudentPage() {
         >
           Faculty
         </Link>
-        <Link
-          to="/student"
+        <span
           style={{
             color: "#1976d2",
-            textDecoration: "none",
             margin: "0 16px",
             fontWeight: 600,
           }}
         >
-          Student
-        </Link>
+          Student ({currentStudent.id})
+        </span>
+        <button
+          onClick={handleLogout}
+          style={{
+            background: "#f44336",
+            color: "#fff",
+            border: "none",
+            borderRadius: 4,
+            padding: "4px 12px",
+            fontSize: 12,
+            cursor: "pointer",
+            marginLeft: 8,
+          }}
+        >
+          Logout
+        </button>
       </nav>
 
       {/* Main Content */}
@@ -510,12 +899,34 @@ export default function StudentPage() {
           <h2
             style={{
               color: "#1976d2",
-              marginBottom: 24,
+              marginBottom: 16,
               fontWeight: 600,
             }}
           >
             📱 QR Code Attendance Scanner
           </h2>
+
+          {/* Student Info Display */}
+          <div
+            style={{
+              background: "#e3f2fd",
+              border: "2px solid #1976d2",
+              borderRadius: 12,
+              padding: "16px",
+              marginBottom: 24,
+              textAlign: "left",
+            }}
+          >
+            <div style={{ fontSize: 14, color: "#1976d2", fontWeight: 600, marginBottom: 8 }}>
+              👤 Logged in as:
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1976d2", marginBottom: 4 }}>
+              {currentStudent.name}
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>
+              ID: {currentStudent.id} | {currentStudent.department} - {currentStudent.year}
+            </div>
+          </div>
 
           {/* Security Status */}
           <div
@@ -554,74 +965,13 @@ export default function StudentPage() {
               {cameraError}
               <br />
               <small>
-                You can still try the camera buttons below or enter QR codes manually.
+                You can still try the camera buttons below.
               </small>
             </div>
           )}
 
-          {/* Student Information Form */}
+          {/* QR Scanner Section */}
           <form onSubmit={handleSubmit} style={{ textAlign: "left" }}>
-            <div style={{ marginBottom: 16 }}>
-              <label
-                style={{
-                  display: "block",
-                  color: "#1976d2",
-                  fontWeight: 500,
-                  marginBottom: 6,
-                  fontSize: 14,
-                }}
-              >
-                Student ID:
-              </label>
-              <input
-                type="text"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #bbdefb",
-                  borderRadius: 6,
-                  fontSize: 14,
-                  outline: "none",
-                  background: "#f3f9ff",
-                }}
-                placeholder="Enter your student ID"
-              />
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label
-                style={{
-                  display: "block",
-                  color: "#1976d2",
-                  fontWeight: 500,
-                  marginBottom: 6,
-                  fontSize: 14,
-                }}
-              >
-                Full Name:
-              </label>
-              <input
-                type="text"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #bbdefb",
-                  borderRadius: 6,
-                  fontSize: 14,
-                  outline: "none",
-                  background: "#f3f9ff",
-                }}
-                placeholder="Enter your full name"
-              />
-            </div>
-
-            {/* QR Scanner Section */}
             <div style={{ marginBottom: 20, textAlign: "center" }}>
               <div
                 style={{
@@ -643,8 +993,8 @@ export default function StudentPage() {
                       }}
                     >
                       {window.isSecureContext 
-                        ? "Try camera scanning or enter QR code manually" 
-                        : "HTTPS required for camera. Use manual input below."}
+                        ? "Use camera to scan QR codes" 
+                        : "HTTPS required for camera access"}
                     </p>
                     
                     {/* Camera buttons */}
@@ -666,26 +1016,7 @@ export default function StudentPage() {
                             marginBottom: 8,
                           }}
                         >
-                          🎯 QR Scanner
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={startBasicCamera}
-                          style={{
-                            background: "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            padding: "12px 20px",
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            marginRight: 8,
-                            marginBottom: 8,
-                          }}
-                        >
-                          📹 Basic Camera
+                          🎯 Start QR Scanner
                         </button>
                         
                         <button
@@ -706,36 +1037,21 @@ export default function StudentPage() {
                           🔧 Test Camera
                         </button>
                       </div>
-                    ) : null}
-                    
-                    {/* Manual QR input */}
-                    <div>
-                      <label
+                    ) : (
+                      <div
                         style={{
-                          display: "block",
-                          color: "#666",
-                          fontWeight: 500,
-                          marginBottom: 6,
-                          fontSize: 12,
+                          background: "#ffebee",
+                          border: "1px solid #f44336",
+                          borderRadius: 8,
+                          padding: "12px",
+                          color: "#c62828",
+                          fontSize: 14,
                         }}
                       >
-                        {window.isSecureContext ? "Or enter QR code manually:" : "Enter QR code manually:"}
-                      </label>
-                      <input
-                        type="text"
-                        value={scannedCode}
-                        onChange={(e) => setScannedCode(e.target.value)}
-                        style={{
-                          width: "100%",
-                          padding: "8px",
-                          border: "1px solid #ddd",
-                          borderRadius: 4,
-                          fontSize: 12,
-                          fontFamily: "monospace",
-                        }}
-                        placeholder="Paste QR code here..."
-                      />
-                    </div>
+                        ⚠️ Camera requires HTTPS connection for security.<br />
+                        Please use HTTPS or contact faculty for assistance.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -745,6 +1061,8 @@ export default function StudentPage() {
                       position: "relative",
                       display: "inline-block",
                       marginBottom: 12,
+                      overflow: "hidden",
+                      borderRadius: 8,
                     }}>
                       <video
                         ref={videoRef}
@@ -759,6 +1077,14 @@ export default function StudentPage() {
                           borderRadius: 8,
                           background: "#000",
                           objectFit: "cover",
+                          transition: "transform 0.3s ease",
+                        }}
+                        onLoadedMetadata={() => {
+                          console.log("Video metadata loaded");
+                        }}
+                        onError={(e) => {
+                          console.error("Video error:", e);
+                          setCameraError("Video playback error. Try a different camera button.");
                         }}
                       />
                       <div style={{
@@ -766,14 +1092,109 @@ export default function StudentPage() {
                         top: "50%",
                         left: "50%",
                         transform: "translate(-50%, -50%)",
-                        width: "70%",
-                        height: "70%",
+                        width: "60%",
+                        height: "60%",
                         border: "2px solid #4caf50",
                         borderRadius: 8,
                         boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.3)",
                         pointerEvents: "none",
                       }} />
+                      
+                      {/* Zoom indicator */}
+                      <div style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        background: "rgba(0, 0, 0, 0.7)",
+                        color: "white",
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}>
+                        🔍 Zoom Available
+                      </div>
                     </div>
+                    
+                    {/* Zoom Controls */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div
+                        style={{
+                          background: "#e3f2fd",
+                          border: "1px solid #2196f3",
+                          borderRadius: 6,
+                          padding: "8px",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>
+                          🔍 Zoom Controls:
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "center", gap: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => handleZoom(1)}
+                            style={{
+                              background: "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            1x
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleZoom(1.5)}
+                            style={{
+                              background: "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            1.5x
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleZoom(2)}
+                            style={{
+                              background: "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            2x
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleZoom(2.5)}
+                            style={{
+                              background: "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              cursor: "pointer",
+                            }}
+                          >
+                            2.5x
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <div style={{ marginBottom: 12 }}>
                       <div
                         style={{
@@ -786,24 +1207,47 @@ export default function StudentPage() {
                           border: "1px solid #4caf50",
                         }}
                       >
-                        🔍 Scanning... Point camera at QR code
+                        🔍 Scanning... Point camera at QR code. Use zoom if code is small.
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={stopScanning}
-                      style={{
-                        background: "#f44336",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        padding: "8px 16px",
-                        fontSize: 14,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ⏹️ Stop Scanner
-                    </button>
+                    <div style={{ marginBottom: 12 }}>
+                      <button
+                        type="button"
+                        onClick={stopScanning}
+                        style={{
+                          background: "#f44336",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "8px 16px",
+                          fontSize: 14,
+                          cursor: "pointer",
+                          marginRight: 8,
+                        }}
+                      >
+                        ⏹️ Stop Scanner
+                      </button>
+                      
+                      {/* Retry button when scanning */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopScanning();
+                          setTimeout(() => startScanning(), 500);
+                        }}
+                        style={{
+                          background: "#ff9800",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "8px 16px",
+                          fontSize: 14,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🔄 Retry
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -834,7 +1278,7 @@ export default function StudentPage() {
                           marginBottom: 8,
                         }}
                       >
-                        QR Code Ready!
+                        QR Code Scanned Successfully!
                       </div>
                       <div
                         style={{
@@ -856,6 +1300,7 @@ export default function StudentPage() {
                       onClick={() => {
                         setScannedCode("");
                         setMessage("");
+                        setIsSuccess(false);
                       }}
                       style={{
                         background: "#1976d2",
@@ -867,7 +1312,7 @@ export default function StudentPage() {
                         cursor: "pointer",
                       }}
                     >
-                      🔄 Clear & Try Again
+                      🔄 Scan Again
                     </button>
                   </div>
                 )}
@@ -931,12 +1376,12 @@ export default function StudentPage() {
                 fontSize: 11,
               }}
             >
-              <li>Fill in your student details above</li>
-              <li>For camera access, HTTPS connection is required</li>
-              <li>Try "QR Scanner" button first on HTTPS</li>
-              <li>If camera issues, try "Basic Camera" or "Test Camera"</li>
-              <li>You can also manually enter/paste QR codes</li>
-              <li>Submit to mark your attendance</li>
+              <li>Your student details are automatically filled</li>
+              <li>HTTPS connection is required for camera access</li>
+              <li>Click "Start QR Scanner" to activate camera</li>
+              <li>Use zoom controls if QR code appears too small</li>
+              <li>Point camera directly at the QR code for best results</li>
+              <li>Submit to mark your attendance once code is scanned</li>
             </ol>
             <em>⏱️ QR codes expire after 30 seconds</em>
           </div>

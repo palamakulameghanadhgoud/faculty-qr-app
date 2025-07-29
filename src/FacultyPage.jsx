@@ -8,6 +8,20 @@ export default function FacultyPage() {
   const [running, setRunning] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
 
+  // Get API URL based on environment
+  const getApiUrl = () => {
+    // Check if we're running through a tunnel
+    if (window.location.hostname.includes('.loca.lt') || 
+        window.location.hostname.includes('.localtunnel.me') ||
+        window.location.hostname.includes('.ngrok')) {
+      // Use environment variable for tunnel
+      return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    } else {
+      // Local development
+      return 'http://localhost:5000';
+    }
+  };
+
   const startQR = () => {
     const t = Math.max(30, duration);
     setTimeLeft(t);
@@ -22,45 +36,10 @@ export default function FacultyPage() {
     setDownloadReady(false);
   };
 
-  useEffect(() => {
-    if (!running) return;
-
-    const countdown = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdown);
-          setRunning(false);
-          setDownloadReady(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    const fetchQR = async () => {
-      try {
-        // Changed back to localhost:5000
-        const res = await fetch("http://localhost:5000/qr");
-        const json = await res.json();
-        setQr(json);
-      } catch (err) {
-        console.error("Failed to fetch QR:", err);
-      }
-    };
-
-    fetchQR();
-    const qrInterval = setInterval(fetchQR, 3000);
-
-    return () => {
-      clearInterval(countdown);
-      clearInterval(qrInterval);
-    };
-  }, [running]);
-
   const handleDownload = async () => {
     try {
-      // Changed back to localhost:5000
-      const response = await fetch("http://localhost:5000/download/excel");
+      const API_BASE_URL = getApiUrl();
+      const response = await fetch(`${API_BASE_URL}/download/excel`);
       
       if (response.ok) {
         // If the response is a file, download it
@@ -85,6 +64,54 @@ export default function FacultyPage() {
       alert('Failed to download attendance file');
     }
   };
+
+  useEffect(() => {
+    if (!running) return;
+
+    const countdown = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          setRunning(false);
+          setDownloadReady(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const fetchQR = async () => {
+      try {
+        const API_BASE_URL = getApiUrl();
+        console.log(`Fetching QR from: ${API_BASE_URL}/qr`);
+        
+        const res = await fetch(`${API_BASE_URL}/qr`);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const json = await res.json();
+        console.log("QR Response:", json);
+        setQr(json);
+      } catch (err) {
+        console.error("Failed to fetch QR:", err);
+        
+        // Show user-friendly error message
+        if (err.message.includes('Failed to fetch')) {
+          console.error("Network error - check if Flask API is accessible");
+        }
+      }
+    };
+
+    fetchQR();
+    const qrInterval = setInterval(fetchQR, 3000);
+
+    return () => {
+      clearInterval(countdown);
+      clearInterval(qrInterval);
+    };
+  }, [running]);
 
   return (
     <div
@@ -324,7 +351,7 @@ export default function FacultyPage() {
                       wordBreak: "break-all",
                     }}
                   >
-                    Download Link:{" "}
+                    QR Code Data:{" "}
                     <span style={{ fontFamily: "monospace", fontSize: 12 }}>{qr.data}</span>
                   </div>
                   <button
@@ -346,7 +373,12 @@ export default function FacultyPage() {
                   </button>
                 </>
               ) : (
-                <p style={{ color: "#b71c1c", fontWeight: 500 }}>Loading QR...</p>
+                <div>
+                  <p style={{ color: "#b71c1c", fontWeight: 500 }}>Loading QR...</p>
+                  <p style={{ color: "#666", fontSize: 12, marginTop: 8 }}>
+                    If QR doesn't load, check if Flask API is running and accessible
+                  </p>
+                </div>
               )}
             </>
           )}
