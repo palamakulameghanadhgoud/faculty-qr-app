@@ -214,8 +214,8 @@ export default function StudentPage() {
     setMessage("Submitting attendance...");
 
     try {
-      // Use environment variable for API base URL
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      // Use environment variable for API base URL - Updated to use correct default
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
       
       const response = await fetch(`${API_BASE_URL}/validate`, {
         method: "POST",
@@ -289,6 +289,76 @@ export default function StudentPage() {
     } catch (error) {
       console.error("Direct camera test failed:", error);
       alert(`Camera test failed: ${error.message}`);
+    }
+  };
+
+  // Timer and QR code fetching logic
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [downloadReady, setDownloadReady] = useState(false);
+  const [qr, setQr] = useState(null);
+
+  useEffect(() => {
+    if (!running) return;
+
+    const countdown = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          setRunning(false);
+          setDownloadReady(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const fetchQR = async () => {
+      try {
+        // Changed from localhost:5000 to localhost:3000
+        const res = await fetch("http://localhost:3000/qr");
+        const json = await res.json();
+        setQr(json);
+      } catch (err) {
+        console.error("Failed to fetch QR:", err);
+      }
+    };
+
+    fetchQR();
+    const qrInterval = setInterval(fetchQR, 3000);
+
+    return () => {
+      clearInterval(countdown);
+      clearInterval(qrInterval);
+    };
+  }, [running]);
+
+  const handleDownload = async () => {
+    try {
+      // Changed from localhost:5000 to localhost:3000
+      const response = await fetch("http://localhost:3000/download/excel");
+      
+      if (response.ok) {
+        // If the response is a file, download it
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // If there's an error, handle JSON response
+        const data = await response.json();
+        console.error('Download failed:', data);
+        alert('Download failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download attendance file');
     }
   };
 
@@ -671,8 +741,8 @@ export default function StudentPage() {
 
                 {isScanning && (
                   <div>
-                    <div style={{ 
-                      position: "relative", 
+                    <div style={{
+                      position: "relative",
                       display: "inline-block",
                       marginBottom: 12,
                     }}>

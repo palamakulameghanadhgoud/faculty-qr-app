@@ -250,15 +250,15 @@ def debug_path():
     })
 
 def run_http_server():
-    """Run HTTP server on port 5001"""
-    print("Starting HTTP server on port 5001...")
-    app.run(debug=False, port=5001, host='0.0.0.0', use_reloader=False)
+    """Run HTTP server on port 5000"""
+    print("Starting HTTP server on port 5000...")
+    app.run(debug=False, port=5000, host='0.0.0.0', use_reloader=False)
 
 def run_https_server():
-    """Run HTTPS server on port 5000"""
-    print("Starting HTTPS server on port 5000...")
+    """Run HTTPS server on port 5001"""
+    print("Starting HTTPS server on port 5001...")
     try:
-        app.run(debug=True, port=5000, host='0.0.0.0', ssl_context='adhoc')
+        app.run(debug=True, port=5001, host='0.0.0.0', ssl_context='adhoc')
     except Exception as e:
         print(f"HTTPS failed: {e}")
         print("Install pyOpenSSL: pip install pyOpenSSL")

@@ -22,8 +22,44 @@ export default function FacultyPage() {
     setDownloadReady(false);
   };
 
+  useEffect(() => {
+    if (!running) return;
+
+    const countdown = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          setRunning(false);
+          setDownloadReady(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const fetchQR = async () => {
+      try {
+        // Changed back to localhost:5000
+        const res = await fetch("http://localhost:5000/qr");
+        const json = await res.json();
+        setQr(json);
+      } catch (err) {
+        console.error("Failed to fetch QR:", err);
+      }
+    };
+
+    fetchQR();
+    const qrInterval = setInterval(fetchQR, 3000);
+
+    return () => {
+      clearInterval(countdown);
+      clearInterval(qrInterval);
+    };
+  }, [running]);
+
   const handleDownload = async () => {
     try {
+      // Changed back to localhost:5000
       const response = await fetch("http://localhost:5000/download/excel");
       
       if (response.ok) {
@@ -49,40 +85,6 @@ export default function FacultyPage() {
       alert('Failed to download attendance file');
     }
   };
-
-  useEffect(() => {
-    if (!running) return;
-
-    const countdown = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(countdown);
-          setRunning(false);
-          setDownloadReady(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    const fetchQR = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/qr");
-        const json = await res.json();
-        setQr(json);
-      } catch (err) {
-        console.error("Failed to fetch QR:", err);
-      }
-    };
-
-    fetchQR();
-    const qrInterval = setInterval(fetchQR, 3000);
-
-    return () => {
-      clearInterval(countdown);
-      clearInterval(qrInterval);
-    };
-  }, [running]);
 
   return (
     <div
