@@ -22,8 +22,32 @@ export default function FacultyPage() {
     setDownloadReady(false);
   };
 
-  const handleDownload = () => {
-    window.open("http://localhost:5000/download/excel", "_blank");
+  const handleDownload = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/download/excel");
+      
+      if (response.ok) {
+        // If the response is a file, download it
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // If there's an error, handle JSON response
+        const data = await response.json();
+        console.error('Download failed:', data);
+        alert('Download failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download attendance file');
+    }
   };
 
   useEffect(() => {
