@@ -27,7 +27,7 @@ export default function StudentPage() {
     const id = `2410080${i.toString().padStart(3, '0')}`;
     studentDatabase[id] = {
       id: id,
-      name: `Student ${i.toString().padStart(3, '0')}`, // You can customize names later
+      name: `Student ${i.toString().padStart(3, '0')}`,
       department: "AIDS",
       year: "2024"
     };
@@ -61,6 +61,36 @@ export default function StudentPage() {
     setMessage("");
     setIsSuccess(false);
     stopScanning();
+  };
+
+  // Stop scanning function - ADDED
+  const stopScanning = () => {
+    try {
+      if (qrScannerRef.current) {
+        qrScannerRef.current.stop();
+        qrScannerRef.current.destroy();
+        qrScannerRef.current = null;
+      }
+      setIsScanning(false);
+      setMessage("");
+      console.log("QR Scanner stopped");
+    } catch (error) {
+      console.error("Error stopping scanner:", error);
+    }
+  };
+
+  // Handle zoom function - ADDED
+  const handleZoom = async (zoomLevel) => {
+    try {
+      if (qrScannerRef.current) {
+        await qrScannerRef.current.setCamera('environment');
+        // Note: Zoom is not directly supported by qr-scanner library
+        // This is a placeholder for zoom functionality
+        console.log(`Zoom set to: ${zoomLevel}x`);
+      }
+    } catch (error) {
+      console.error("Zoom error:", error);
+    }
   };
 
   // Check if camera is available
@@ -153,7 +183,7 @@ export default function StudentPage() {
       videoRef.current.style.height = "240px";
       videoRef.current.style.objectFit = "cover";
 
-      // Create QR Scanner with enhanced error handling
+      // Create QR Scanner
       qrScannerRef.current = new QrScanner(
         videoRef.current,
         async (result) => {
@@ -264,7 +294,7 @@ export default function StudentPage() {
       // Use the correct API URL
       const API_BASE_URL = window.location.hostname.includes('.onrender.com') 
         ? window.location.origin 
-        : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
+        : 'https://py-lq4p.onrender.com';
       console.log(`Attempting to connect to: ${API_BASE_URL}/validate`);
       
       const response = await fetch(`${API_BASE_URL}/validate`, {
@@ -1292,7 +1322,6 @@ export default function StudentPage() {
               <li>Your student details are automatically filled</li>
               <li>HTTPS connection is required for camera access</li>
               <li>Click "Start QR Scanner" to activate camera</li>
-              <li>Use zoom controls if QR code appears too small</li>
               <li>Point camera directly at the QR code</li>
               <li>Attendance will be marked automatically when QR is detected</li>
             </ol>
