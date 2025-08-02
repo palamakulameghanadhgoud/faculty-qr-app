@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kl-attendance-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn qr_api:app
+    envVars:
+      - key: MONGODB_URI
+        value: mongodb+srv://megh:marco@vicecluster.4wafcsu.mongodb.net/?retryWrites=true&w=majority&appName=vicecluster
+      - key: DATABASE_NAME
+        value: kl_university_attendance
+      - key: STUDENTS_COLLECTION
+        value: students
+      - key: ATTENDANCE_COLLECTION
+        value: attendance_records
+      - key: QR_SESSIONS_COLLECTION
+        value: qr_sessions
+      - key: PYTHON_VERSION
+        value: 3.11.0

@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build-api": "pip install -r requirements.txt",
+    "start-api": "python qr_api.py",
+    "start": "gunicorn qr_api:app"
   },
   "dependencies": {
     "jsqr": "^1.4.0",

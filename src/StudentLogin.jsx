@@ -355,7 +355,9 @@ export default function StudentPage() {
 
     try {
       // Use the correct API URL
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const API_BASE_URL = window.location.hostname.includes('.onrender.com') 
+        ? window.location.origin 
+        : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
       console.log(`Attempting to connect to: ${API_BASE_URL}/validate`);
       
       const response = await fetch(`${API_BASE_URL}/validate`, {

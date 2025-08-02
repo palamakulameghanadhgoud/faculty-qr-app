@@ -10,16 +10,19 @@ export default function FacultyPage() {
 
   // Get API URL based on environment
   const getApiUrl = () => {
-    // Check if we're running through a tunnel
-    if (window.location.hostname.includes('.loca.lt') || 
-        window.location.hostname.includes('.localtunnel.me') ||
-        window.location.hostname.includes('.ngrok')) {
-      // Use environment variable for tunnel
-      return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-    } else {
-      // Local development
-      return 'http://localhost:5000';
+    // Check if we're in production (Render)
+    if (window.location.hostname.includes('.onrender.com')) {
+      return window.location.origin;
     }
+    
+    // Check environment variable
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    if (envUrl && !envUrl.includes('/api')) {
+      return envUrl;
+    }
+    
+    // Fallback for local development
+    return 'http://localhost:5000';
   };
 
   const startQR = () => {
