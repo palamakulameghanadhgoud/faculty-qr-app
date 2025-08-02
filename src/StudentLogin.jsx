@@ -156,12 +156,15 @@ export default function StudentPage() {
       // Create QR Scanner with enhanced error handling
       qrScannerRef.current = new QrScanner(
         videoRef.current,
-        (result) => {
+        async (result) => {
           console.log("QR Code detected:", result.data);
           setScannedCode(result.data);
           stopScanning();
-          setMessage("QR Code scanned successfully!");
+          setMessage("QR Code scanned! Marking attendance...");
           setIsSuccess(true);
+          
+          // Automatically submit attendance when QR is scanned
+          await submitAttendance(result.data);
         },
         {
           returnDetailedScanResult: true,
@@ -212,7 +215,7 @@ export default function StudentPage() {
       // Start the scanner
       await qrScannerRef.current.start();
       
-      setMessage("Camera started. Point at QR code to scan. Use zoom controls if needed.");
+      setMessage("Camera started. Point at QR code to scan. Attendance will be marked automatically.");
       console.log("QR Scanner started successfully");
 
     } catch (error) {
@@ -240,106 +243,10 @@ export default function StudentPage() {
     }
   };
 
-  // Enhanced zoom with better error handling
-  const handleZoom = async (zoomLevel) => {
-    try {
-      if (!videoRef.current || !videoRef.current.srcObject) {
-        console.warn("No video stream available for zoom");
-        setMessage("No camera active. Please start scanning first.");
-        return;
-      }
-
-      const stream = videoRef.current.srcObject;
-      const tracks = stream.getVideoTracks();
-      
-      if (tracks.length === 0) {
-        console.warn("No video tracks available");
-        setMessage("No camera stream available for zoom.");
-        return;
-      }
-
-      const track = tracks[0];
-      
-      try {
-        const capabilities = track.getCapabilities();
-        
-        if (capabilities && capabilities.zoom) {
-          await track.applyConstraints({
-            advanced: [{ zoom: zoomLevel }]
-          });
-          console.log(`Hardware zoom set to: ${zoomLevel}`);
-          setMessage(`Zoom set to ${zoomLevel}x - Hardware zoom applied`);
-        } else {
-          // Fallback to CSS zoom
-          videoRef.current.style.transform = `scale(${zoomLevel})`;
-          videoRef.current.style.transformOrigin = 'center center';
-          console.log(`CSS zoom set to: ${zoomLevel}`);
-          setMessage(`Zoom set to ${zoomLevel}x - Software zoom applied`);
-        }
-      } catch (constraintError) {
-        console.warn("Hardware zoom failed, using CSS fallback:", constraintError);
-        // Fallback to CSS zoom
-        videoRef.current.style.transform = `scale(${zoomLevel})`;
-        videoRef.current.style.transformOrigin = 'center center';
-        setMessage(`Zoom set to ${zoomLevel}x - Software zoom applied`);
-      }
-    } catch (error) {
-      console.error("Zoom error:", error);
-      setCameraError(`Zoom failed: ${error.message}`);
-    }
-  };
-
-  // Enhanced stop scanning with cleanup
-  const stopScanning = () => {
-    try {
-      // Stop QR scanner
-      if (qrScannerRef.current) {
-        try {
-          qrScannerRef.current.stop();
-          qrScannerRef.current.destroy();
-        } catch (error) {
-          console.warn("Error stopping QR scanner:", error);
-        }
-        qrScannerRef.current = null;
-      }
-      
-      // Stop camera stream
-      if (videoRef.current && videoRef.current.srcObject) {
-        try {
-          const stream = videoRef.current.srcObject;
-          stream.getTracks().forEach(track => {
-            try {
-              track.stop();
-            } catch (error) {
-              console.warn("Error stopping track:", error);
-            }
-          });
-          videoRef.current.srcObject = null;
-          
-          // Reset video styles
-          videoRef.current.style.transform = '';
-          videoRef.current.style.transformOrigin = '';
-        } catch (error) {
-          console.warn("Error cleaning up video:", error);
-        }
-      }
-      
-      setIsScanning(false);
-      setMessage("");
-      setCameraError("");
-      
-    } catch (error) {
-      console.error("Error in stopScanning:", error);
-      setIsScanning(false);
-    }
-  };
-
-  // Submit attendance
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!scannedCode) {
-      setMessage("Please scan a QR code first");
+  // Submit attendance - extracted as separate function for automatic calling
+  const submitAttendance = async (qrCode) => {
+    if (!qrCode) {
+      setMessage("No QR code to process");
       setIsSuccess(false);
       return;
     }
@@ -351,7 +258,7 @@ export default function StudentPage() {
     }
 
     setIsLoading(true);
-    setMessage("Submitting attendance...");
+    setMessage("Marking attendance...");
 
     try {
       // Use the correct API URL
@@ -366,7 +273,7 @@ export default function StudentPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          qr_code: scannedCode,
+          qr_code: qrCode,
           student_id: currentStudent.id,
           student_name: currentStudent.name,
         }),
@@ -383,12 +290,23 @@ export default function StudentPage() {
 
       if (data.valid) {
         setIsSuccess(true);
-        setMessage(data.message);
+        setMessage(`✅ ${data.message}`);
         setScannedCode("");
-        // Don't clear student info as they remain logged in
+        
+        // Auto-clear message after 3 seconds and allow new scan
+        setTimeout(() => {
+          setMessage("");
+          setIsSuccess(false);
+        }, 3000);
       } else {
         setIsSuccess(false);
-        setMessage(data.message);
+        setMessage(`❌ ${data.message}`);
+        setScannedCode("");
+        
+        // Auto-clear error message after 3 seconds
+        setTimeout(() => {
+          setMessage("");
+        }, 3000);
       }
     } catch (error) {
       setIsSuccess(false);
@@ -396,14 +314,21 @@ export default function StudentPage() {
       
       // More specific error messages
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        setMessage("Cannot connect to server. Make sure the Flask API is running on port 5000.");
+        setMessage("❌ Cannot connect to server. Make sure the Flask API is running.");
       } else if (error.message.includes('CORS')) {
-        setMessage("CORS error. Check server configuration.");
+        setMessage("❌ CORS error. Check server configuration.");
       } else if (error.message.includes('HTTP error')) {
-        setMessage(`Server error: ${error.message}. Check server logs.`);
+        setMessage(`❌ Server error: ${error.message}. Check server logs.`);
       } else {
-        setMessage("Network error. Please check connection and try again.");
+        setMessage("❌ Network error. Please check connection and try again.");
       }
+      
+      setScannedCode("");
+      
+      // Auto-clear error message after 5 seconds
+      setTimeout(() => {
+        setMessage("");
+      }, 5000);
     } finally {
       setIsLoading(false);
     }
@@ -972,340 +897,272 @@ export default function StudentPage() {
             </div>
           )}
 
-          {/* QR Scanner Section */}
-          <form onSubmit={handleSubmit} style={{ textAlign: "left" }}>
-            <div style={{ marginBottom: 20, textAlign: "center" }}>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  border: "2px dashed #1976d2",
-                  borderRadius: 12,
-                  padding: "20px",
-                  marginBottom: 16,
-                }}
-              >
-                {!isScanning && !scannedCode && (
-                  <div>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>📷</div>
-                    <p
-                      style={{
-                        color: "#666",
-                        marginBottom: 16,
-                        fontSize: 14,
-                      }}
-                    >
-                      {window.isSecureContext 
-                        ? "Use camera to scan QR codes" 
-                        : "HTTPS required for camera access"}
-                    </p>
-                    
-                    {/* Camera buttons */}
-                    {window.isSecureContext || window.location.hostname === 'localhost' ? (
-                      <div style={{ marginBottom: 16 }}>
-                        <button
-                          type="button"
-                          onClick={startScanning}
-                          style={{
-                            background: "#4caf50",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            padding: "12px 20px",
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            marginRight: 8,
-                            marginBottom: 8,
-                          }}
-                        >
-                          🎯 Start QR Scanner
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={testCameraDirectly}
-                          style={{
-                            background: "#ff9800",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            padding: "12px 20px",
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            marginBottom: 8,
-                          }}
-                        >
-                          🔧 Test Camera
-                        </button>
-                      </div>
-                    ) : (
-                      <div
+          {/* QR Scanner Section - Remove the form wrapper */}
+          <div style={{ marginBottom: 20, textAlign: "center" }}>
+            <div
+              style={{
+                background: "#f8f9fa",
+                border: "2px dashed #1976d2",
+                borderRadius: 12,
+                padding: "20px",
+                marginBottom: 16,
+              }}
+            >
+              {!isScanning && !scannedCode && !isLoading && (
+                <div>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📷</div>
+                  <p
+                    style={{
+                      color: "#666",
+                      marginBottom: 16,
+                      fontSize: 14,
+                    }}
+                  >
+                    {window.isSecureContext 
+                      ? "Scan QR code to mark attendance automatically" 
+                      : "HTTPS required for camera access"}
+                  </p>
+                  
+                  {/* Camera buttons */}
+                  {window.isSecureContext || window.location.hostname === 'localhost' ? (
+                    <div style={{ marginBottom: 16 }}>
+                      <button
+                        type="button"
+                        onClick={startScanning}
                         style={{
-                          background: "#ffebee",
-                          border: "1px solid #f44336",
+                          background: "#4caf50",
+                          color: "#fff",
+                          border: "none",
                           borderRadius: 8,
-                          padding: "12px",
-                          color: "#c62828",
+                          padding: "12px 20px",
                           fontSize: 14,
-                        }}
-                      >
-                        ⚠️ Camera requires HTTPS connection for security.<br />
-                        Please use HTTPS or contact faculty for assistance.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {isScanning && (
-                  <div>
-                    <div style={{
-                      position: "relative",
-                      display: "inline-block",
-                      marginBottom: 12,
-                      overflow: "hidden",
-                      borderRadius: 8,
-                    }}>
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{
-                          width: "100%",
-                          maxWidth: 320,
-                          height: 240,
-                          border: "3px solid #4caf50",
-                          borderRadius: 8,
-                          background: "#000",
-                          objectFit: "cover",
-                          transition: "transform 0.3s ease",
-                        }}
-                        onLoadedMetadata={() => {
-                          console.log("Video metadata loaded");
-                        }}
-                        onError={(e) => {
-                          console.error("Video error:", e);
-                          setCameraError("Video playback error. Try a different camera button.");
-                        }}
-                      />
-                      <div style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%)",
-                        width: "60%",
-                        height: "60%",
-                        border: "2px solid #4caf50",
-                        borderRadius: 8,
-                        boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.3)",
-                        pointerEvents: "none",
-                      }} />
-                      
-                      {/* Zoom indicator */}
-                      <div style={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        background: "rgba(0, 0, 0, 0.7)",
-                        color: "white",
-                        padding: "4px 8px",
-                        borderRadius: 4,
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}>
-                        🔍 Zoom Available
-                      </div>
-                    </div>
-                    
-                    {/* Zoom Controls */}
-                    <div style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          background: "#e3f2fd",
-                          border: "1px solid #2196f3",
-                          borderRadius: 6,
-                          padding: "8px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          marginRight: 8,
                           marginBottom: 8,
                         }}
                       >
-                        <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>
-                          🔍 Zoom Controls:
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => handleZoom(1)}
-                            style={{
-                              background: "#2196f3",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 4,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            1x
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleZoom(1.5)}
-                            style={{
-                              background: "#2196f3",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 4,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            1.5x
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleZoom(2)}
-                            style={{
-                              background: "#2196f3",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 4,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            2x
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleZoom(2.5)}
-                            style={{
-                              background: "#2196f3",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: 4,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              cursor: "pointer",
-                            }}
-                          >
-                            2.5x
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          background: "#e8f5e8",
-                          color: "#2e7d32",
-                          padding: "8px 12px",
-                          borderRadius: 6,
-                          fontSize: 14,
-                          marginBottom: 12,
-                          border: "1px solid #4caf50",
-                        }}
-                      >
-                        🔍 Scanning... Point camera at QR code. Use zoom if code is small.
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <button
-                        type="button"
-                        onClick={stopScanning}
-                        style={{
-                          background: "#f44336",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          padding: "8px 16px",
-                          fontSize: 14,
-                          cursor: "pointer",
-                          marginRight: 8,
-                        }}
-                      >
-                        ⏹️ Stop Scanner
+                        🎯 Start QR Scanner
                       </button>
                       
-                      {/* Retry button when scanning */}
                       <button
                         type="button"
-                        onClick={() => {
-                          stopScanning();
-                          setTimeout(() => startScanning(), 500);
-                        }}
+                        onClick={testCameraDirectly}
                         style={{
                           background: "#ff9800",
                           color: "#fff",
                           border: "none",
-                          borderRadius: 6,
-                          padding: "8px 16px",
+                          borderRadius: 8,
+                          padding: "12px 20px",
                           fontSize: 14,
-                          cursor: "pointer",
-                        }}
-                      >
-                        🔄 Retry
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {scannedCode && !isScanning && (
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 48,
-                        color: "#4caf50",
-                        marginBottom: 12,
-                      }}
-                    >
-                      ✅
-                    </div>
-                    <div
-                      style={{
-                        background: "#e8f5e8",
-                        border: "2px solid #4caf50",
-                        borderRadius: 8,
-                        padding: "12px",
-                        marginBottom: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#2e7d32",
                           fontWeight: 600,
+                          cursor: "pointer",
                           marginBottom: 8,
                         }}
                       >
-                        QR Code Scanned Successfully!
+                        🔧 Test Camera
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        background: "#ffebee",
+                        border: "1px solid #f44336",
+                        borderRadius: 8,
+                        padding: "12px",
+                        color: "#c62828",
+                        fontSize: 14,
+                      }}
+                    >
+                      ⚠️ Camera requires HTTPS connection for security.<br />
+                      Please use HTTPS or contact faculty for assistance.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isScanning && (
+                <div>
+                  <div style={{
+                    position: "relative",
+                    display: "inline-block",
+                    marginBottom: 12,
+                    overflow: "hidden",
+                    borderRadius: 8,
+                  }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{
+                        width: "100%",
+                        maxWidth: 320,
+                        height: 240,
+                        border: "3px solid #4caf50",
+                        borderRadius: 8,
+                        background: "#000",
+                        objectFit: "cover",
+                        transition: "transform 0.3s ease",
+                      }}
+                      onLoadedMetadata={() => {
+                        console.log("Video metadata loaded");
+                      }}
+                      onError={(e) => {
+                        console.error("Video error:", e);
+                        setCameraError("Video playback error. Try a different camera button.");
+                      }}
+                    />
+                    <div style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: "translate(-50%, -50%)",
+                      width: "60%",
+                      height: "60%",
+                      border: "2px solid #4caf50",
+                      borderRadius: 8,
+                      boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.3)",
+                      pointerEvents: "none",
+                    }} />
+                    
+                    {/* Zoom indicator */}
+                    <div style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      background: "rgba(0, 0, 0, 0.7)",
+                      color: "white",
+                      padding: "4px 8px",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}>
+                      🔍 Zoom Available
+                    </div>
+                  </div>
+                  
+                  {/* Zoom Controls */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div
+                      style={{
+                        background: "#e3f2fd",
+                        border: "1px solid #2196f3",
+                        borderRadius: 6,
+                        padding: "8px",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>
+                        🔍 Zoom Controls:
                       </div>
-                      <div
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: 12,
-                          color: "#1976d2",
-                          wordBreak: "break-all",
-                          background: "#fff",
-                          padding: "6px",
-                          borderRadius: 4,
-                          border: "1px solid #e0e0e0",
-                        }}
-                      >
-                        {scannedCode}
+                      <div style={{ display: "flex", justifyContent: "center", gap: "4px" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(1)}
+                          style={{
+                            background: "#2196f3",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          1x
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(1.5)}
+                          style={{
+                            background: "#2196f3",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          1.5x
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(2)}
+                          style={{
+                            background: "#2196f3",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          2x
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(2.5)}
+                          style={{
+                            background: "#2196f3",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          2.5x
+                        </button>
                       </div>
                     </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: 12 }}>
+                    <div
+                      style={{
+                        background: "#e8f5e8",
+                        color: "#2e7d32",
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                        fontSize: 14,
+                        marginBottom: 12,
+                        border: "1px solid #4caf50",
+                      }}
+                    >
+                      🔍 Scanning... Point camera at QR code. Attendance will be marked automatically.
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <button
+                      type="button"
+                      onClick={stopScanning}
+                      style={{
+                        background: "#f44336",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "8px 16px",
+                        fontSize: 14,
+                        cursor: "pointer",
+                        marginRight: 8,
+                      }}
+                    >
+                      ⏹️ Stop Scanner
+                    </button>
+                    
+                    {/* Retry button when scanning */}
                     <button
                       type="button"
                       onClick={() => {
-                        setScannedCode("");
-                        setMessage("");
-                        setIsSuccess(false);
+                        stopScanning();
+                        setTimeout(() => startScanning(), 500);
                       }}
                       style={{
-                        background: "#1976d2",
+                        background: "#ff9800",
                         color: "#fff",
                         border: "none",
                         borderRadius: 6,
@@ -1314,35 +1171,89 @@ export default function StudentPage() {
                         cursor: "pointer",
                       }}
                     >
-                      🔄 Scan Again
+                      🔄 Retry
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {isLoading && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 48,
+                      color: "#ff9800",
+                      marginBottom: 12,
+                    }}
+                  >
+                    ⏳
+                  </div>
+                  <div
+                    style={{
+                      background: "#fff3cd",
+                      border: "2px solid #ffc107",
+                      borderRadius: 8,
+                      padding: "12px",
+                      marginBottom: 12,
+                      color: "#856404",
+                      fontWeight: 600,
+                    }}
+                  >
+                    📤 Marking attendance... Please wait.
+                  </div>
+                </div>
+              )}
+
+              {!isScanning && !isLoading && message && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 48,
+                      color: isSuccess ? "#4caf50" : "#f44336",
+                      marginBottom: 12,
+                    }}
+                  >
+                    {isSuccess ? "✅" : "❌"}
+                  </div>
+                  <div
+                    style={{
+                      background: isSuccess ? "#e8f5e8" : "#ffebee",
+                      border: `2px solid ${isSuccess ? "#4caf50" : "#f44336"}`,
+                      borderRadius: 8,
+                      padding: "12px",
+                      marginBottom: 12,
+                      color: isSuccess ? "#2e7d32" : "#c62828",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {message}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessage("");
+                      setIsSuccess(false);
+                      setScannedCode("");
+                    }}
+                    style={{
+                      background: "#1976d2",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "8px 16px",
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🔄 Scan Another QR Code
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={isLoading || !scannedCode}
-              style={{
-                width: "100%",
-                background: isLoading || !scannedCode ? "#ccc" : "#1976d2",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                padding: "14px",
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: isLoading || !scannedCode ? "not-allowed" : "pointer",
-                boxShadow: "0 2px 8px rgba(25, 118, 210, 0.3)",
-                transition: "background 0.2s",
-              }}
-            >
-              {isLoading ? "📤 Submitting..." : "✅ Mark Attendance"}
-            </button>
-          </form>
-
-          {message && (
+          {/* Status message display (if needed for other states) */}
+          {message && isScanning && (
             <div
               style={{
                 marginTop: 20,
@@ -1382,10 +1293,10 @@ export default function StudentPage() {
               <li>HTTPS connection is required for camera access</li>
               <li>Click "Start QR Scanner" to activate camera</li>
               <li>Use zoom controls if QR code appears too small</li>
-              <li>Point camera directly at the QR code for best results</li>
-              <li>Submit to mark your attendance once code is scanned</li>
+              <li>Point camera directly at the QR code</li>
+              <li>Attendance will be marked automatically when QR is detected</li>
             </ol>
-            <em>⏱️ QR codes expire after 30 seconds</em>
+            <em>⏱️ QR codes expire after 30 seconds. Scan immediately after generation.</em>
           </div>
         </div>
       </main>
