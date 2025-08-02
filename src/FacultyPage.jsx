@@ -15,14 +15,8 @@ export default function FacultyPage() {
       return window.location.origin;
     }
     
-    // Check environment variable
-    const envUrl = import.meta.env.VITE_API_BASE_URL;
-    if (envUrl && !envUrl.includes('/api')) {
-      return envUrl;
-    }
-    
-    // Fallback for local development
-    return 'http://localhost:5000';
+    // Use your specific backend URL
+    return 'https://py-lq4p.onrender.com';
   };
 
   const startQR = () => {

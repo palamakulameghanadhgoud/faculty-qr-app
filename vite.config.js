@@ -27,9 +27,9 @@ export default defineConfig({
     // Add proxy for API calls during development
     proxy: {
       '/api': {
-        target: 'http://localhost:5000', // Updated to your current IP
+        target: 'https://py-lq4p.onrender.com', // Updated to your Render URL
         changeOrigin: true,
-        secure: false,
+        secure: true, // Changed to true for HTTPS
         rewrite: (path) => path.replace(/^\/api/, '')
       }
     }

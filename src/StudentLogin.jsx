@@ -1392,3 +1392,14 @@ export default function StudentPage() {
     </div>
   );
 }
+
+// Helper function to get the correct API URL
+const getApiUrl = () => {
+  // Check if we're in production (Render)
+  if (window.location.hostname.includes('.onrender.com')) {
+    return window.location.origin;
+  }
+  
+  // Use your specific backend URL
+  return 'https://py-lq4p.onrender.com';
+};
