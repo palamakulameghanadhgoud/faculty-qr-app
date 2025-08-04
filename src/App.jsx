@@ -45,6 +45,25 @@ function HomePage() {
           alignItems: "center",
         }}
       >
+        {/* AI&DS Department Label */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 16,
+            background: "rgba(255, 255, 255, 0.15)",
+            color: "#fff",
+            padding: "4px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 1,
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+          }}
+        >
+          
+        </div>
+        
         <img
           src="/Lg.png"
           alt="KL University Logo"
@@ -63,10 +82,10 @@ function HomePage() {
         />
         <div style={{ flex: 1, textAlign: "center" }}>
           <h1 style={{ margin: 0, fontSize: 44, letterSpacing: 2, fontWeight: 500, textTransform: "uppercase" }}>
-            attendu
+            MARKMEE
           </h1>
           <div style={{ fontSize: 20, letterSpacing: 1, marginTop: 4, fontWeight: 500 }}>
-            attendance system - <span style={{ color: "#2e7d32", background: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>KL University</span>
+            Department OF AI&DS <span style={{ color: "#2e7d32", background: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}></span>
           </div>
         </div>
       </header>

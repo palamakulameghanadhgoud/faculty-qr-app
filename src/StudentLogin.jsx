@@ -17,9 +17,12 @@ export default function StudentPage() {
   const [scannedCode, setScannedCode] = useState("");
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [currentZoom, setCurrentZoom] = useState(1);
+  const [maxZoom, setMaxZoom] = useState(3);
 
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
+  const streamRef = useRef(null);
 
   // Predefined student database (2410080001 to 2410080085)
   const studentDatabase = {};
@@ -63,7 +66,7 @@ export default function StudentPage() {
     stopScanning();
   };
 
-  // Stop scanning function - ADDED
+  // Stop scanning function
   const stopScanning = () => {
     try {
       if (qrScannerRef.current) {
@@ -71,25 +74,63 @@ export default function StudentPage() {
         qrScannerRef.current.destroy();
         qrScannerRef.current = null;
       }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       setIsScanning(false);
       setMessage("");
+      setCurrentZoom(1);
       console.log("QR Scanner stopped");
     } catch (error) {
       console.error("Error stopping scanner:", error);
     }
   };
 
-  // Handle zoom function - ADDED
+  // Handle zoom function - FIXED with proper MediaTrackConstraints
   const handleZoom = async (zoomLevel) => {
     try {
-      if (qrScannerRef.current) {
-        await qrScannerRef.current.setCamera('environment');
-        // Note: Zoom is not directly supported by qr-scanner library
-        // This is a placeholder for zoom functionality
-        console.log(`Zoom set to: ${zoomLevel}x`);
+      if (!streamRef.current) {
+        console.warn("No active stream for zoom");
+        return;
+      }
+
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      if (!videoTrack) {
+        console.warn("No video track found");
+        return;
+      }
+
+      // Check if zoom is supported
+      const capabilities = videoTrack.getCapabilities();
+      console.log("Camera capabilities:", capabilities);
+
+      if (capabilities.zoom) {
+        // Use native zoom if available
+        const constraints = {
+          advanced: [{ zoom: Math.min(zoomLevel, capabilities.zoom.max) }]
+        };
+        await videoTrack.applyConstraints(constraints);
+        setCurrentZoom(zoomLevel);
+        console.log(`Native zoom applied: ${zoomLevel}x`);
+      } else {
+        // Fallback to CSS transform zoom
+        if (videoRef.current) {
+          videoRef.current.style.transform = `scale(${zoomLevel})`;
+          videoRef.current.style.transformOrigin = 'center center';
+          setCurrentZoom(zoomLevel);
+          console.log(`CSS zoom applied: ${zoomLevel}x`);
+        }
       }
     } catch (error) {
       console.error("Zoom error:", error);
+      // Fallback to CSS zoom if constraints fail
+      if (videoRef.current) {
+        videoRef.current.style.transform = `scale(${zoomLevel})`;
+        videoRef.current.style.transformOrigin = 'center center';
+        setCurrentZoom(zoomLevel);
+        console.log(`Fallback CSS zoom applied: ${zoomLevel}x`);
+      }
     }
   };
 
@@ -97,13 +138,11 @@ export default function StudentPage() {
   useEffect(() => {
     const checkCamera = async () => {
       try {
-        // Check if we have basic media devices support
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError("Camera API not supported in this browser");
           return;
         }
 
-        // More lenient check - allow camera attempt even on HTTP if localhost
         const isSecureContext = window.isSecureContext;
         const isLocalhost = window.location.hostname === 'localhost' || 
                            window.location.hostname === '127.0.0.1';
@@ -113,7 +152,6 @@ export default function StudentPage() {
           return;
         }
 
-        // Try to check camera availability
         try {
           const hasCamera = await QrScanner.hasCamera();
           setHasCamera(hasCamera);
@@ -121,7 +159,6 @@ export default function StudentPage() {
           if (!hasCamera) {
             setCameraError("No camera found on this device");
           } else {
-            // Test camera permissions
             try {
               const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
@@ -130,7 +167,18 @@ export default function StudentPage() {
                   facingMode: { ideal: 'environment' }
                 } 
               });
-              stream.getTracks().forEach(track => track.stop()); // Stop test stream
+              
+              // Check zoom capabilities
+              const videoTrack = stream.getVideoTracks()[0];
+              if (videoTrack) {
+                const capabilities = videoTrack.getCapabilities();
+                if (capabilities.zoom) {
+                  setMaxZoom(Math.min(capabilities.zoom.max, 5));
+                  console.log(`Camera supports zoom up to ${capabilities.zoom.max}x`);
+                }
+              }
+              
+              stream.getTracks().forEach(track => track.stop());
               setCameraError("");
               console.log("Camera test successful!");
             } catch (permError) {
@@ -165,23 +213,35 @@ export default function StudentPage() {
       setCameraError("");
       setMessage("Starting camera...");
       setIsScanning(true);
+      setCurrentZoom(1);
 
-      // Wait for video element to be ready
       await new Promise(resolve => setTimeout(resolve, 200));
 
       if (!videoRef.current) {
         throw new Error("Video element not ready");
       }
 
-      // Ensure video element is properly mounted in DOM
       if (!document.contains(videoRef.current)) {
         throw new Error("Video element not in DOM");
       }
 
-      // Set initial video properties to prevent undefined errors
+      // Get camera stream first
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: { ideal: 'environment' }
+        }
+      });
+
+      streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+
+      // Set video properties
       videoRef.current.style.width = "100%";
       videoRef.current.style.height = "240px";
       videoRef.current.style.objectFit = "cover";
+      videoRef.current.style.transform = "scale(1)";
 
       // Create QR Scanner
       qrScannerRef.current = new QrScanner(
@@ -193,7 +253,6 @@ export default function StudentPage() {
           setMessage("QR Code scanned! Marking attendance...");
           setIsSuccess(true);
           
-          // Automatically submit attendance when QR is scanned
           await submitAttendance(result.data);
         },
         {
@@ -202,7 +261,6 @@ export default function StudentPage() {
           highlightCodeOutline: true,
           preferredCamera: "environment",
           maxScansPerSecond: 3,
-          // Simplified scan region calculation
           calculateScanRegion: (video) => {
             try {
               if (!video || !video.videoWidth || !video.videoHeight) {
@@ -235,17 +293,16 @@ export default function StudentPage() {
         }
       );
 
-      // Add error handler to QR scanner
       qrScannerRef.current.onError = (error) => {
         console.error("QR Scanner error:", error);
         setCameraError(`Scanner error: ${error.message}`);
         setIsScanning(false);
       };
 
-      // Start the scanner
+      // Start scanning (but don't start camera again since we already have the stream)
       await qrScannerRef.current.start();
       
-      setMessage("Camera started. Point at QR code to scan. Attendance will be marked automatically.");
+      setMessage("Camera started. Point at QR code to scan. Use zoom controls if needed.");
       console.log("QR Scanner started successfully");
 
     } catch (error) {
@@ -291,7 +348,6 @@ export default function StudentPage() {
     setMessage("Marking attendance...");
 
     try {
-      // Use the correct API URL
       const API_BASE_URL = window.location.hostname.includes('.onrender.com') 
         ? window.location.origin 
         : 'https://py-lq4p.onrender.com';
@@ -323,7 +379,6 @@ export default function StudentPage() {
         setMessage(`✅ ${data.message}`);
         setScannedCode("");
         
-        // Auto-clear message after 3 seconds and allow new scan
         setTimeout(() => {
           setMessage("");
           setIsSuccess(false);
@@ -333,7 +388,6 @@ export default function StudentPage() {
         setMessage(`❌ ${data.message}`);
         setScannedCode("");
         
-        // Auto-clear error message after 3 seconds
         setTimeout(() => {
           setMessage("");
         }, 3000);
@@ -342,7 +396,6 @@ export default function StudentPage() {
       setIsSuccess(false);
       console.error("Detailed validation error:", error);
       
-      // More specific error messages
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         setMessage("❌ Cannot connect to server. Make sure the Flask API is running.");
       } else if (error.message.includes('CORS')) {
@@ -355,7 +408,6 @@ export default function StudentPage() {
       
       setScannedCode("");
       
-      // Auto-clear error message after 5 seconds
       setTimeout(() => {
         setMessage("");
       }, 5000);
@@ -390,7 +442,6 @@ export default function StudentPage() {
         setMessage("Camera test successful! Stream active for 5 seconds.");
       }
       
-      // Stop after 5 seconds
       setTimeout(() => {
         stream.getTracks().forEach(track => track.stop());
         if (videoRef.current) {
@@ -431,8 +482,28 @@ export default function StudentPage() {
             minHeight: 90,
             display: "flex",
             alignItems: "center",
+            position: "relative",
           }}
         >
+          {/* AI&DS Department Label */}
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 16,
+              background: "rgba(255, 255, 255, 0.15)",
+              color: "#fff",
+              padding: "4px 12px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: 1,
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+            }}
+          >
+            AI&DS
+          </div>
+
           <img
             src="/Lg.png"
             alt="KL University Logo"
@@ -611,6 +682,7 @@ export default function StudentPage() {
                     fontSize: 16,
                     outline: "none",
                     background: "#f3f9ff",
+                    color: "#000", // Add explicit black text color
                     transition: "border-color 0.2s",
                   }}
                   placeholder="Enter your student ID (e.g., 2410080001)"
@@ -718,8 +790,28 @@ export default function StudentPage() {
           minHeight: 90,
           display: "flex",
           alignItems: "center",
+          position: "relative",
         }}
       >
+        {/* AI&DS Department Label */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 16,
+            background: "rgba(255, 255, 255, 0.15)",
+            color: "#fff",
+            padding: "4px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 1,
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+          }}
+        >
+          AI&DS
+        </div>
+
         <img
           src="/Lg.png"
           alt="KL University Logo"
@@ -927,7 +1019,7 @@ export default function StudentPage() {
             </div>
           )}
 
-          {/* QR Scanner Section - Remove the form wrapper */}
+          {/* QR Scanner Section */}
           <div style={{ marginBottom: 20, textAlign: "center" }}>
             <div
               style={{
@@ -1068,11 +1160,11 @@ export default function StudentPage() {
                       fontSize: 12,
                       fontWeight: 600,
                     }}>
-                      🔍 Zoom Available
+                      🔍 {currentZoom}x
                     </div>
                   </div>
                   
-                  {/* Zoom Controls */}
+                  {/* IMPROVED Zoom Controls */}
                   <div style={{ marginBottom: 12 }}>
                     <div
                       style={{
@@ -1084,20 +1176,21 @@ export default function StudentPage() {
                       }}
                     >
                       <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>
-                        🔍 Zoom Controls:
+                        🔍 Zoom Controls: (Current: {currentZoom}x)
                       </div>
-                      <div style={{ display: "flex", justifyContent: "center", gap: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "center", gap: "4px", marginBottom: 6 }}>
                         <button
                           type="button"
                           onClick={() => handleZoom(1)}
                           style={{
-                            background: "#2196f3",
+                            background: currentZoom === 1 ? "#1976d2" : "#2196f3",
                             color: "#fff",
                             border: "none",
                             borderRadius: 4,
                             padding: "4px 8px",
                             fontSize: 11,
                             cursor: "pointer",
+                            fontWeight: currentZoom === 1 ? 600 : 400,
                           }}
                         >
                           1x
@@ -1106,13 +1199,14 @@ export default function StudentPage() {
                           type="button"
                           onClick={() => handleZoom(1.5)}
                           style={{
-                            background: "#2196f3",
+                            background: currentZoom === 1.5 ? "#1976d2" : "#2196f3",
                             color: "#fff",
                             border: "none",
                             borderRadius: 4,
                             padding: "4px 8px",
                             fontSize: 11,
                             cursor: "pointer",
+                            fontWeight: currentZoom === 1.5 ? 600 : 400,
                           }}
                         >
                           1.5x
@@ -1121,13 +1215,14 @@ export default function StudentPage() {
                           type="button"
                           onClick={() => handleZoom(2)}
                           style={{
-                            background: "#2196f3",
+                            background: currentZoom === 2 ? "#1976d2" : "#2196f3",
                             color: "#fff",
                             border: "none",
                             borderRadius: 4,
                             padding: "4px 8px",
                             fontSize: 11,
                             cursor: "pointer",
+                            fontWeight: currentZoom === 2 ? 600 : 400,
                           }}
                         >
                           2x
@@ -1136,17 +1231,37 @@ export default function StudentPage() {
                           type="button"
                           onClick={() => handleZoom(2.5)}
                           style={{
-                            background: "#2196f3",
+                            background: currentZoom === 2.5 ? "#1976d2" : "#2196f3",
                             color: "#fff",
                             border: "none",
                             borderRadius: 4,
                             padding: "4px 8px",
                             fontSize: 11,
                             cursor: "pointer",
+                            fontWeight: currentZoom === 2.5 ? 600 : 400,
                           }}
                         >
                           2.5x
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(3)}
+                          style={{
+                            background: currentZoom === 3 ? "#1976d2" : "#2196f3",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                            fontWeight: currentZoom === 3 ? 600 : 400,
+                          }}
+                        >
+                          3x
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 10, color: "#666", textAlign: "center" }}>
+                        Use higher zoom for distant QR codes
                       </div>
                     </div>
                   </div>
@@ -1282,24 +1397,6 @@ export default function StudentPage() {
             </div>
           </div>
 
-          {/* Status message display (if needed for other states) */}
-          {message && isScanning && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: "12px",
-                borderRadius: 8,
-                background: isSuccess ? "#e8f5e8" : "#ffebee",
-                color: isSuccess ? "#2e7d32" : "#c62828",
-                fontWeight: 500,
-                border: `1px solid ${isSuccess ? "#c8e6c9" : "#ffcdd2"}`,
-                fontSize: 14,
-              }}
-            >
-              {message}
-            </div>
-          )}
-
           <div
             style={{
               marginTop: 20,
@@ -1322,6 +1419,7 @@ export default function StudentPage() {
               <li>Your student details are automatically filled</li>
               <li>HTTPS connection is required for camera access</li>
               <li>Click "Start QR Scanner" to activate camera</li>
+              <li>Use zoom controls to focus on distant QR codes</li>
               <li>Point camera directly at the QR code</li>
               <li>Attendance will be marked automatically when QR is detected</li>
             </ol>
