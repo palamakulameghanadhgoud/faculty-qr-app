@@ -18,7 +18,7 @@ export default function StudentPage() {
   const [hasCamera, setHasCamera] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [currentZoom, setCurrentZoom] = useState(1);
-  const [maxZoom, setMaxZoom] = useState(3);
+  const [maxZoom, setMaxZoom] = useState(10); // Updated to 10x
 
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
@@ -87,7 +87,7 @@ export default function StudentPage() {
     }
   };
 
-  // Handle zoom function - FIXED with proper MediaTrackConstraints
+  // Handle zoom function - ENHANCED to support up to 10x zoom
   const handleZoom = async (zoomLevel) => {
     try {
       if (!streamRef.current) {
@@ -107,14 +107,27 @@ export default function StudentPage() {
 
       if (capabilities.zoom) {
         // Use native zoom if available
+        const maxNativeZoom = capabilities.zoom.max;
+        const actualZoom = Math.min(zoomLevel, maxNativeZoom);
+        
         const constraints = {
-          advanced: [{ zoom: Math.min(zoomLevel, capabilities.zoom.max) }]
+          advanced: [{ zoom: actualZoom }]
         };
         await videoTrack.applyConstraints(constraints);
         setCurrentZoom(zoomLevel);
-        console.log(`Native zoom applied: ${zoomLevel}x`);
+        console.log(`Native zoom applied: ${actualZoom}x (requested: ${zoomLevel}x, max: ${maxNativeZoom}x)`);
+        
+        // If requested zoom is higher than native zoom, apply additional CSS zoom
+        if (zoomLevel > maxNativeZoom && videoRef.current) {
+          const additionalZoom = zoomLevel / maxNativeZoom;
+          videoRef.current.style.transform = `scale(${additionalZoom})`;
+          videoRef.current.style.transformOrigin = 'center center';
+          console.log(`Additional CSS zoom applied: ${additionalZoom}x`);
+        } else if (videoRef.current) {
+          videoRef.current.style.transform = 'scale(1)';
+        }
       } else {
-        // Fallback to CSS transform zoom
+        // Fallback to CSS transform zoom only
         if (videoRef.current) {
           videoRef.current.style.transform = `scale(${zoomLevel})`;
           videoRef.current.style.transformOrigin = 'center center';
@@ -173,8 +186,8 @@ export default function StudentPage() {
               if (videoTrack) {
                 const capabilities = videoTrack.getCapabilities();
                 if (capabilities.zoom) {
-                  setMaxZoom(Math.min(capabilities.zoom.max, 5));
-                  console.log(`Camera supports zoom up to ${capabilities.zoom.max}x`);
+                  setMaxZoom(Math.min(capabilities.zoom.max, 10)); // Cap at 10x but check native support
+                  console.log(`Camera supports native zoom up to ${capabilities.zoom.max}x, capped at 10x`);
                 }
               }
               
@@ -837,7 +850,7 @@ export default function StudentPage() {
               textTransform: "uppercase",
             }}
           >
-            attendu
+            MARKMEE
           </h1>
           <div
             style={{
@@ -857,7 +870,7 @@ export default function StudentPage() {
                 fontWeight: 700,
               }}
             >
-              KL University
+              DEPARTMENT OF AI&DS
             </span>
           </div>
         </div>
@@ -1164,7 +1177,7 @@ export default function StudentPage() {
                     </div>
                   </div>
                   
-                  {/* IMPROVED Zoom Controls */}
+                  {/* ENHANCED Zoom Controls - Up to 10x */}
                   <div style={{ marginBottom: 12 }}>
                     <div
                       style={{
@@ -1176,92 +1189,83 @@ export default function StudentPage() {
                       }}
                     >
                       <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>
-                        🔍 Zoom Controls: (Current: {currentZoom}x)
+                        🔍 Zoom Controls: (Current: {currentZoom}x) - Up to 10x
                       </div>
-                      <div style={{ display: "flex", justifyContent: "center", gap: "4px", marginBottom: 6 }}>
-                        <button
-                          type="button"
-                          onClick={() => handleZoom(1)}
-                          style={{
-                            background: currentZoom === 1 ? "#1976d2" : "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                            fontWeight: currentZoom === 1 ? 600 : 400,
-                          }}
-                        >
-                          1x
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleZoom(1.5)}
-                          style={{
-                            background: currentZoom === 1.5 ? "#1976d2" : "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                            fontWeight: currentZoom === 1.5 ? 600 : 400,
-                          }}
-                        >
-                          1.5x
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleZoom(2)}
-                          style={{
-                            background: currentZoom === 2 ? "#1976d2" : "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                            fontWeight: currentZoom === 2 ? 600 : 400,
-                          }}
-                        >
-                          2x
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleZoom(2.5)}
-                          style={{
-                            background: currentZoom === 2.5 ? "#1976d2" : "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                            fontWeight: currentZoom === 2.5 ? 600 : 400,
-                          }}
-                        >
-                          2.5x
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleZoom(3)}
-                          style={{
-                            background: currentZoom === 3 ? "#1976d2" : "#2196f3",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                            cursor: "pointer",
-                            fontWeight: currentZoom === 3 ? 600 : 400,
-                          }}
-                        >
-                          3x
-                        </button>
+                      
+                      {/* First row of zoom buttons */}
+                      <div style={{ display: "flex", justifyContent: "center", gap: "3px", marginBottom: 4 }}>
+                        {[1, 1.5, 2, 2.5, 3].map(zoom => (
+                          <button
+                            key={zoom}
+                            type="button"
+                            onClick={() => handleZoom(zoom)}
+                            style={{
+                              background: currentZoom === zoom ? "#1976d2" : "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 6px",
+                              fontSize: 10,
+                              cursor: "pointer",
+                              fontWeight: currentZoom === zoom ? 600 : 400,
+                              minWidth: "28px",
+                            }}
+                          >
+                            {zoom}x
+                          </button>
+                        ))}
                       </div>
+                      
+                      {/* Second row of zoom buttons */}
+                      <div style={{ display: "flex", justifyContent: "center", gap: "3px", marginBottom: 6 }}>
+                        {[4, 5, 6, 7, 8].map(zoom => (
+                          <button
+                            key={zoom}
+                            type="button"
+                            onClick={() => handleZoom(zoom)}
+                            style={{
+                              background: currentZoom === zoom ? "#1976d2" : "#2196f3",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 6px",
+                              fontSize: 10,
+                              cursor: "pointer",
+                              fontWeight: currentZoom === zoom ? 600 : 400,
+                              minWidth: "28px",
+                            }}
+                          >
+                            {zoom}x
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Third row for highest zoom levels */}
+                      <div style={{ display: "flex", justifyContent: "center", gap: "3px", marginBottom: 6 }}>
+                        {[9, 10].map(zoom => (
+                          <button
+                            key={zoom}
+                            type="button"
+                            onClick={() => handleZoom(zoom)}
+                            style={{
+                              background: currentZoom === zoom ? "#1976d2" : "#ff5722",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              padding: "4px 8px",
+                              fontSize: 10,
+                              cursor: "pointer",
+                              fontWeight: currentZoom === zoom ? 600 : 400,
+                              minWidth: "32px",
+                            }}
+                          >
+                            {zoom}x
+                          </button>
+                        ))}
+                      </div>
+                      
                       <div style={{ fontSize: 10, color: "#666", textAlign: "center" }}>
-                        Use higher zoom for distant QR codes
+                        High zoom (6x+) for very distant QR codes. May reduce image quality.
                       </div>
                     </div>
                   </div>
@@ -1419,7 +1423,8 @@ export default function StudentPage() {
               <li>Your student details are automatically filled</li>
               <li>HTTPS connection is required for camera access</li>
               <li>Click "Start QR Scanner" to activate camera</li>
-              <li>Use zoom controls to focus on distant QR codes</li>
+              <li>Use zoom controls (1x to 10x) to focus on distant QR codes</li>
+              <li>Higher zoom levels (6x+) are for very distant codes</li>
               <li>Point camera directly at the QR code</li>
               <li>Attendance will be marked automatically when QR is detected</li>
             </ol>
