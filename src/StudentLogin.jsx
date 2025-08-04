@@ -6,8 +6,11 @@ export default function StudentPage() {
   // Authentication states
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [currentStudent, setCurrentStudent] = useState(null);
+  const [studentCredentials, setStudentCredentials] = useState({});
+  const [credentialsLoaded, setCredentialsLoaded] = useState(false);
 
   // Existing states
   const [message, setMessage] = useState("");
@@ -24,42 +27,83 @@ export default function StudentPage() {
   const qrScannerRef = useRef(null);
   const streamRef = useRef(null);
 
-  // Predefined student database (2410080001 to 2410080085)
-  const studentDatabase = {};
-  for (let i = 1; i <= 85; i++) {
-    const id = `2410080${i.toString().padStart(3, '0')}`;
-    studentDatabase[id] = {
-      id: id,
-      name: `Student ${i.toString().padStart(3, '0')}`,
-      department: "AIDS",
-      year: "2024"
+  // Load student credentials from pass.s.txt file
+  useEffect(() => {
+    const loadStudentCredentials = async () => {
+      try {
+        const response = await fetch('/pass.s.txt');
+        if (!response.ok) {
+          throw new Error('Failed to load student credentials file');
+        }
+        const text = await response.text();
+        const credentials = {};
+        
+        // Parse the file content
+        text.split('\n').forEach(line => {
+          const trimmedLine = line.trim();
+          if (trimmedLine && trimmedLine.includes(':')) {
+            const [studentId, password] = trimmedLine.split(':');
+            if (studentId && password) {
+              const id = studentId.trim();
+              credentials[id] = {
+                id: id,
+                password: password.trim(),
+                name: `Student ${id.slice(-3)}`, // Extract last 3 digits for name
+                department: "AI&DS",
+                year: "2024"
+              };
+            }
+          }
+        });
+        
+        setStudentCredentials(credentials);
+        setCredentialsLoaded(true);
+        console.log('Student credentials loaded:', Object.keys(credentials).length, 'students');
+      } catch (error) {
+        console.error('Error loading student credentials:', error);
+        setLoginError('Failed to load student authentication system. Please contact faculty.');
+        setCredentialsLoaded(true);
+      }
     };
-  }
+
+    loadStudentCredentials();
+  }, []);
 
   // Authentication functions
   const handleLogin = (e) => {
     e.preventDefault();
-    const trimmedId = loginId.trim();
     
-    if (!trimmedId) {
-      setLoginError("Please enter your Student ID");
+    if (!credentialsLoaded) {
+      setLoginError("Authentication system not ready. Please wait and try again.");
       return;
     }
 
-    if (studentDatabase[trimmedId]) {
-      setCurrentStudent(studentDatabase[trimmedId]);
+    const trimmedId = loginId.trim();
+    const trimmedPassword = loginPassword.trim();
+    
+    if (!trimmedId || !trimmedPassword) {
+      setLoginError("Please enter both Student ID and password");
+      return;
+    }
+
+    if (studentCredentials[trimmedId] && studentCredentials[trimmedId].password === trimmedPassword) {
+      setCurrentStudent(studentCredentials[trimmedId]);
       setIsLoggedIn(true);
       setLoginError("");
       setLoginId("");
-      console.log(`Student logged in: ${studentDatabase[trimmedId].name} (${trimmedId})`);
+      setLoginPassword("");
+      console.log(`Student logged in: ${studentCredentials[trimmedId].name} (${trimmedId})`);
     } else {
-      setLoginError("Invalid Student ID. Please check your ID and try again.");
+      setLoginError("Invalid Student ID or password. Please check your credentials and try again.");
     }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentStudent(null);
+    setLoginId("");
+    setLoginPassword("");
+    setLoginError("");
     setScannedCode("");
     setMessage("");
     setIsSuccess(false);
@@ -542,7 +586,7 @@ export default function StudentPage() {
                 textTransform: "uppercase",
               }}
             >
-              attendu
+              MARKMEE
             </h1>
             <div
               style={{
@@ -562,7 +606,7 @@ export default function StudentPage() {
                   fontWeight: 700,
                 }}
               >
-                KL University
+                DEPARTMENT OF AI&DS
               </span>
             </div>
           </div>
@@ -666,11 +710,29 @@ export default function StudentPage() {
                 lineHeight: 1.5,
               }}
             >
-              Enter your Student ID to access the QR attendance system
+              Enter your Student ID and password to access the QR attendance system
             </p>
 
+            {/* Loading state while credentials are loading */}
+            {!credentialsLoaded && (
+              <div
+                style={{
+                  background: "#fff3cd",
+                  border: "1px solid #ffc107",
+                  borderRadius: 8,
+                  padding: "12px",
+                  marginBottom: 20,
+                  color: "#856404",
+                  fontSize: 14,
+                  textAlign: "center",
+                }}
+              >
+                🔄 Loading student authentication system...
+              </div>
+            )}
+
             <form onSubmit={handleLogin} style={{ textAlign: "left" }}>
-              <div style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: 20 }}>
                 <label
                   style={{
                     display: "block",
@@ -687,6 +749,7 @@ export default function StudentPage() {
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   required
+                  disabled={!credentialsLoaded}
                   style={{
                     width: "100%",
                     padding: "14px 16px",
@@ -694,13 +757,54 @@ export default function StudentPage() {
                     borderRadius: 8,
                     fontSize: 16,
                     outline: "none",
-                    background: "#f3f9ff",
-                    color: "#000", // Add explicit black text color
+                    background: credentialsLoaded ? "#f3f9ff" : "#f5f5f5",
+                    color: "#000",
                     transition: "border-color 0.2s",
+                    opacity: credentialsLoaded ? 1 : 0.7,
                   }}
                   placeholder="Enter your student ID (e.g., 2410080001)"
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#1976d2";
+                    if (credentialsLoaded) e.target.style.borderColor = "#1976d2";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#bbdefb";
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label
+                  style={{
+                    display: "block",
+                    color: "#1976d2",
+                    fontWeight: 600,
+                    marginBottom: 8,
+                    fontSize: 14,
+                  }}
+                >
+                  Password:
+                </label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  disabled={!credentialsLoaded}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    border: "2px solid #bbdefb",
+                    borderRadius: 8,
+                    fontSize: 16,
+                    outline: "none",
+                    background: credentialsLoaded ? "#f3f9ff" : "#f5f5f5",
+                    color: "#000",
+                    transition: "border-color 0.2s",
+                    opacity: credentialsLoaded ? 1 : 0.7,
+                  }}
+                  placeholder="Enter your password (e.g., student001)"
+                  onFocus={(e) => {
+                    if (credentialsLoaded) e.target.style.borderColor = "#1976d2";
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = "#bbdefb";
@@ -728,29 +832,35 @@ export default function StudentPage() {
 
               <button
                 type="submit"
+                disabled={!credentialsLoaded}
                 style={{
                   width: "100%",
-                  background: "#1976d2",
+                  background: credentialsLoaded ? "#1976d2" : "#ccc",
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
                   padding: "16px",
                   fontSize: 16,
                   fontWeight: 600,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(25, 118, 210, 0.3)",
+                  cursor: credentialsLoaded ? "pointer" : "not-allowed",
+                  boxShadow: credentialsLoaded ? "0 4px 12px rgba(25, 118, 210, 0.3)" : "none",
                   transition: "all 0.2s",
+                  opacity: credentialsLoaded ? 1 : 0.7,
                 }}
                 onMouseOver={(e) => {
-                  e.target.style.background = "#1565c0";
-                  e.target.style.transform = "translateY(-1px)";
+                  if (credentialsLoaded) {
+                    e.target.style.background = "#1565c0";
+                    e.target.style.transform = "translateY(-1px)";
+                  }
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.background = "#1976d2";
-                  e.target.style.transform = "translateY(0)";
+                  if (credentialsLoaded) {
+                    e.target.style.background = "#1976d2";
+                    e.target.style.transform = "translateY(0)";
+                  }
                 }}
               >
-                🔑 Login to Attendance System
+                {credentialsLoaded ? "🔑 Login to Attendance System" : "Loading..."}
               </button>
             </form>
 
@@ -765,12 +875,13 @@ export default function StudentPage() {
                 textAlign: "left",
               }}
             >
-              <strong>📋 Valid Student IDs:</strong>
+              <strong>📋 Student Login Information:</strong>
               <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.4 }}>
-                • IDs range from <strong>2410080001</strong> to <strong>2410080085</strong><br />
-                • Contact faculty if your ID is not working<br />
-                • Make sure to enter the complete 10-digit ID<br />
-                • No spaces or special characters allowed
+                • Student IDs: <strong>2410080001</strong> to <strong>2410080085</strong><br />
+                • Password format: <strong>student001</strong>, <strong>student002</strong>, etc.<br />
+                • Password matches the last 3 digits of your ID<br />
+                • Both ID and password are required for login<br />
+                • {credentialsLoaded ? `${Object.keys(studentCredentials).length} student accounts loaded` : 'Loading credentials...'}
               </div>
             </div>
           </div>
@@ -779,7 +890,7 @@ export default function StudentPage() {
     );
   }
 
-  // MAIN ATTENDANCE SCREEN (after login)
+  // MAIN ATTENDANCE SCREEN (after login) - Keep existing code with minor updates
   return (
     <div
       style={{
@@ -1420,7 +1531,7 @@ export default function StudentPage() {
                 fontSize: 11,
               }}
             >
-              <li>Your student details are automatically filled</li>
+              <li>Student credentials loaded from secure authentication system</li>
               <li>HTTPS connection is required for camera access</li>
               <li>Click "Start QR Scanner" to activate camera</li>
               <li>Use zoom controls (1x to 10x) to focus on distant QR codes</li>
@@ -1428,7 +1539,7 @@ export default function StudentPage() {
               <li>Point camera directly at the QR code</li>
               <li>Attendance will be marked automatically when QR is detected</li>
             </ol>
-            <em>⏱️ QR codes expire after 30 seconds. Scan immediately after generation.</em>
+            <em>⏱️ QR codes expire after 30 seconds. Login required for each session.</em>
           </div>
         </div>
       </main>
