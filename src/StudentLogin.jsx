@@ -295,45 +295,53 @@ export default function StudentPage() {
       setIsSuccess(false);
       return;
     }
+
     setIsLoading(true);
     setMessage("Marking attendance...");
 
     const API_BASE = resolveApiBase();
-    const variants = [
-      (c) => ({ qr_code: c, student_id: currentStudent.id }),        // primary assumption
-      (c) => ({ qr: c, student_id: currentStudent.id }),             // fallback 1
-      (c) => ({ code: c, student_id: currentStudent.id })            // fallback 2
+
+    // Primary assumed payload (most backends need all three fields)
+    const basePayload = {
+      qr_code: qrCode,
+      student_id: currentStudent.id,
+      student_name: currentStudent.name
+    };
+
+    // Fallback key variants if first returns 400
+    const variantPayloads = [
+      basePayload,
+      { qr: qrCode, student_id: currentStudent.id, student_name: currentStudent.name },
+      { code: qrCode, student_id: currentStudent.id, student_name: currentStudent.name }
     ];
 
     let success = false;
-    let lastErrorText = "";
-    for (let i = 0; i < variants.length && !success; i++) {
-      const payload = variants[i](qrCode);
+    let lastError = "";
+
+    for (let i = 0; i < variantPayloads.length && !success; i++) {
+      const payload = variantPayloads[i];
+      console.log(`Attempt ${i + 1} -> POST ${API_BASE}/validate`, payload);
       try {
-        console.log(`Attempt ${i + 1} payload:`, payload);
         const res = await fetch(`${API_BASE}/validate`, {
           method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
 
         const raw = await res.text();
         let data;
-        try {
-          data = raw ? JSON.parse(raw) : {};
-        } catch {
-          data = { parse_error: true, raw };
-        }
-        console.log(`Attempt ${i + 1} status:`, res.status, "data:", data);
+        try { data = raw ? JSON.parse(raw) : {}; } catch { data = { parse_error: true, raw }; }
+
+        console.log(`Attempt ${i + 1} status: ${res.status}`, data);
 
         if (!res.ok) {
-          lastErrorText = data.message || data.error || raw || `HTTP ${res.status}`;
-          // Only retry on 400/422 style validation issues
+          lastError = data.message || data.error || raw || `HTTP ${res.status}`;
+          // Retry only for validation-style errors
           if (![400, 422].includes(res.status)) break;
           continue;
         }
 
-        // Success HTTP
+        // HTTP OK
         if (data.valid) {
           setIsSuccess(true);
           setMessage(`✅ ${data.message || "Attendance marked"}`);
@@ -342,22 +350,19 @@ export default function StudentPage() {
           setMessage(`❌ ${data.message || "Invalid / expired QR"}`);
         }
         success = true;
-      } catch (err) {
-        console.error(`Attempt ${i + 1} network error:`, err);
-        lastErrorText = err.message;
-        // Retry next variant
+      } catch (e) {
+        console.error(`Network error attempt ${i + 1}:`, e);
+        lastError = e.message;
       }
     }
 
     if (!success) {
       setIsSuccess(false);
-      setMessage(`❌ Attendance failed: ${lastErrorText || "Unknown error"}`);
+      setMessage(`❌ Attendance failed: ${lastError || "Unknown error"}`);
     }
 
     setScannedCode("");
-    setTimeout(() => {
-      if (!isScanning) setMessage("");
-    }, success ? 3000 : 5000);
+    setTimeout(() => { if (!isScanning) setMessage(""); }, success ? 3000 : 5000);
     setIsLoading(false);
   };
 
