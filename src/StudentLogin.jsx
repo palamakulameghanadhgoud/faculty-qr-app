@@ -2,17 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import QrScanner from "qr-scanner";
 
-export default function StudentPage() {
-  // Authentication states
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginId, setLoginId] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [currentStudent, setCurrentStudent] = useState(null);
-  const [studentCredentials, setStudentCredentials] = useState({});
-  const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+const RED = "#b71c1c";
+const RED_DARK = "#a0171b";
+const RED_LIGHT = "#fff3f3";
+const WHITE = "#fff";
 
-  // Scanner / attendance states
+export default function StudentPage() {
+  // Attendance / scanner states
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +18,9 @@ export default function StudentPage() {
   const [cameraError, setCameraError] = useState("");
   const [currentZoom, setCurrentZoom] = useState(1);
   const [maxZoom, setMaxZoom] = useState(10);
+
+  // Add state for full screen
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
@@ -37,79 +36,6 @@ export default function StudentPage() {
       return window.location.origin;
     }
     return "https://py-lq4p.onrender.com";
-  };
-
-  // -------- Load student credentials --------
-  useEffect(() => {
-    const loadStudentCredentials = async () => {
-      try {
-        const response = await fetch("/pass.s.txt");
-        if (!response.ok) throw new Error("Failed to load student credentials file");
-        const text = await response.text();
-        const creds = {};
-        text.split("\n").forEach(line => {
-          const trimmed = line.trim();
-          if (trimmed && trimmed.includes(":")) {
-            const [id, pass] = trimmed.split(":");
-            if (id && pass) {
-              const sid = id.trim();
-              creds[sid] = {
-                id: sid,
-                password: pass.trim(),
-                name: `Student ${sid.slice(-3)}`,
-                department: "AI&DS",
-                year: "2024"
-              };
-            }
-          }
-        });
-        setStudentCredentials(creds);
-        setCredentialsLoaded(true);
-        console.log("Student credentials loaded:", Object.keys(creds).length);
-      } catch (err) {
-        console.error("Credential load error:", err);
-        setLoginError("Failed to load student authentication system. Contact faculty.");
-        setCredentialsLoaded(true);
-      }
-    };
-    loadStudentCredentials();
-  }, []);
-
-  // -------- Auth --------
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (!credentialsLoaded) {
-      setLoginError("Authentication system not ready. Try again.");
-      return;
-    }
-    const id = loginId.trim();
-    const pwd = loginPassword.trim();
-    if (!id || !pwd) {
-      setLoginError("Please enter both Student ID and password");
-      return;
-    }
-    if (studentCredentials[id] && studentCredentials[id].password === pwd) {
-      setCurrentStudent(studentCredentials[id]);
-      setIsLoggedIn(true);
-      setLoginError("");
-      setLoginId("");
-      setLoginPassword("");
-      console.log("Student logged in:", id);
-    } else {
-      setLoginError("Invalid Student ID or password.");
-    }
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentStudent(null);
-    setLoginId("");
-    setLoginPassword("");
-    setLoginError("");
-    setScannedCode("");
-    setMessage("");
-    setIsSuccess(false);
-    stopScanning();
   };
 
   // -------- Scanner control --------
@@ -290,11 +216,6 @@ export default function StudentPage() {
       setIsSuccess(false);
       return;
     }
-    if (!currentStudent) {
-      setMessage("Error: No student logged in");
-      setIsSuccess(false);
-      return;
-    }
 
     setIsLoading(true);
     setMessage("Marking attendance...");
@@ -304,15 +225,15 @@ export default function StudentPage() {
     // Primary assumed payload (most backends need all three fields)
     const basePayload = {
       qr_code: qrCode,
-      student_id: currentStudent.id,
-      student_name: currentStudent.name
+      student_id: "2410080001", // Use a default or dummy student ID
+      student_name: "Student 001" // Use a default or dummy student name
     };
 
     // Fallback key variants if first returns 400
     const variantPayloads = [
       basePayload,
-      { qr: qrCode, student_id: currentStudent.id, student_name: currentStudent.name },
-      { code: qrCode, student_id: currentStudent.id, student_name: currentStudent.name }
+      { qr: qrCode, student_id: "2410080001", student_name: "Student 001" },
+      { code: qrCode, student_id: "2410080001", student_name: "Student 001" }
     ];
 
     let success = false;
@@ -391,264 +312,385 @@ export default function StudentPage() {
     }
   };
 
-  // -------- Login Screen --------
-  if (!isLoggedIn) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Segoe UI, Arial, sans-serif" }}>
-        <header style={{ width: "100vw", background: "#1976d2", color: "#fff", padding: 0, textAlign: "center", boxShadow: "0 2px 16px rgba(25,118,210,0.13)", minHeight: 90, display: "flex", alignItems: "center", position: "relative" }}>
-          <div style={{ position: "absolute", top: 8, left: 16, background: "rgba(255,255,255,0.15)", color: "#fff", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, letterSpacing: 1, border: "1px solid rgba(255,255,255,0.3)" }}>AI&DS</div>
-          <img src="/Lg.png" alt="KL University Logo" style={{ height: 100, marginLeft: 32, marginRight: 24, marginTop: 10, marginBottom: 10, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(25,118,210,0.08)", objectFit: "contain" }} />
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <h1 style={{ margin: 0, fontSize: 44, letterSpacing: 2, fontWeight: 500, textTransform: "uppercase" }}>MARKMEE</h1>
-            <div style={{ fontSize: 20, letterSpacing: 1, marginTop: 4, fontWeight: 500 }}>
-              student login - <span style={{ color: "#1976d2", background: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>DEPARTMENT OF AI&DS</span>
-            </div>
-          </div>
-        </header>
+  // --- Fullscreen handler ---
+  const openFullScreen = () => setIsFullScreen(true);
+  const closeFullScreen = () => {
+    setIsFullScreen(false);
+    stopScanning();
+  };
 
-        <nav style={{ background: "#f5f5f5", padding: "12px 0", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", width: "100%", marginBottom: 20 }}>
-          <Link to="/" style={{ color: "#666", textDecoration: "none", margin: "0 16px", fontWeight: 500 }}>Home</Link>
-          <Link to="/faculty" style={{ color: "#b71c1c", textDecoration: "none", margin: "0 16px", fontWeight: 500 }}>Faculty</Link>
-          <Link to="/student" style={{ color: "#1976d2", textDecoration: "none", margin: "0 16px", fontWeight: 600 }}>Student</Link>
-        </nav>
+  // --- Pinch/scroll zoom handlers ---
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const handleWheel = (e) => {
+      if (!isScanning) return;
+      e.preventDefault();
+      let next = currentZoom + (e.deltaY < 0 ? 0.2 : -0.2);
+      next = Math.max(1, Math.min(10, next));
+      handleZoom(Number(next.toFixed(1)));
+    };
+    let pinchStart = null;
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchStart = Math.sqrt(dx * dx + dy * dy);
+      }
+    };
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 2 && pinchStart) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const pinchNow = Math.sqrt(dx * dx + dy * dy);
+        let diff = (pinchNow - pinchStart) / 100;
+        let next = currentZoom + diff;
+        next = Math.max(1, Math.min(10, next));
+        handleZoom(Number(next.toFixed(1)));
+        pinchStart = pinchNow;
+      }
+    };
+    const el = document.getElementById("fullscreen-scanner");
+    if (el) {
+      el.addEventListener("wheel", handleWheel, { passive: false });
+      el.addEventListener("touchstart", handleTouchStart, { passive: false });
+      el.addEventListener("touchmove", handleTouchMove, { passive: false });
+    }
+    return () => {
+      if (el) {
+        el.removeEventListener("wheel", handleWheel);
+        el.removeEventListener("touchstart", handleTouchStart);
+        el.removeEventListener("touchmove", handleTouchMove);
+      }
+    };
+  }, [isFullScreen, isScanning, currentZoom]);
 
-        <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: "100vw", padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 4px 32px rgba(25,118,210,0.13)", padding: "48px 32px", minWidth: 380, maxWidth: 420, width: "100%", textAlign: "center" }}>
-            <div style={{ fontSize: 64, marginBottom: 20, color: "#1976d2" }}>🎓</div>
-            <h2 style={{ color: "#1976d2", marginBottom: 24, fontWeight: 600, fontSize: 24 }}>Student Login</h2>
-            <p style={{ color: "#666", marginBottom: 32, fontSize: 16, lineHeight: 1.5 }}>
-              Enter your Student ID and password to access the QR attendance system
-            </p>
-
-            {!credentialsLoaded && (
-              <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 8, padding: 12, marginBottom: 20, color: "#856404", fontSize: 14 }}>
-                🔄 Loading student authentication system...
-              </div>
-            )}
-
-            <form onSubmit={handleLogin} style={{ textAlign: "left" }}>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", color: "#1976d2", fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Student ID:</label>
-                <input
-                  type="text"
-                  value={loginId}
-                  onChange={(e) => setLoginId(e.target.value)}
-                  required
-                  disabled={!credentialsLoaded}
-                  style={{ width: "100%", padding: "14px 16px", border: "2px solid #bbdefb", borderRadius: 8, fontSize: 16, background: credentialsLoaded ? "#f3f9ff" : "#f5f5f5", color: "#000", outline: "none" }}
-                  placeholder="2410080001"
-                />
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <label style={{ display: "block", color: "#1976d2", fontWeight: 600, marginBottom: 8, fontSize: 14 }}>Password:</label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  required
-                  disabled={!credentialsLoaded}
-                  style={{ width: "100%", padding: "14px 16px", border: "2px solid #bbdefb", borderRadius: 8, fontSize: 16, background: credentialsLoaded ? "#f3f9ff" : "#f5f5f5", color: "#000", outline: "none" }}
-                  placeholder="student001"
-                />
-              </div>
-              {loginError && (
-                <div style={{ background: "#ffebee", border: "1px solid #f44336", borderRadius: 8, padding: 12, marginBottom: 24, color: "#c62828", fontSize: 14, textAlign: "center" }}>
-                  <strong>⚠️ Login Failed:</strong><br />{loginError}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={!credentialsLoaded}
-                style={{
-                  width: "100%", background: credentialsLoaded ? "#1976d2" : "#ccc", color: "#fff",
-                  border: "none", borderRadius: 8, padding: 16, fontSize: 16, fontWeight: 600,
-                  cursor: credentialsLoaded ? "pointer" : "not-allowed"
-                }}
-              >
-                {credentialsLoaded ? "🔑 Login to Attendance System" : "Loading..."}
-              </button>
-            </form>
-
-            <div style={{ marginTop: 32, padding: 16, background: "#f3f9ff", borderRadius: 8, fontSize: 12, color: "#1976d2", textAlign: "left" }}>
-              <strong>📋 Info:</strong>
-              <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.4 }}>
-                • IDs: 2410080001 - 2410080085<br />
-                • Password: studentNNN (last 3 digits)<br />
-                • {credentialsLoaded ? `${Object.keys(studentCredentials).length} accounts loaded` : "Loading..."}
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // -------- Attendance Screen --------
+  // -------- Main Student Dashboard --------
   return (
-    <div style={{ minHeight: "100vh", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Segoe UI, Arial, sans-serif" }}>
-      <header style={{ width: "100vw", background: "#1976d2", color: "#fff", padding: 0, textAlign: "center", boxShadow: "0 2px 16px rgba(25,118,210,0.13)", minHeight: 90, display: "flex", alignItems: "center", position: "relative" }}>
-        <div style={{ position: "absolute", top: 8, left: 16, background: "rgba(255,255,255,0.15)", color: "#fff", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, letterSpacing: 1, border: "1px solid rgba(255,255,255,0.3)" }}>AI&DS</div>
-        <img src="/Lg.png" alt="KL University Logo" style={{ height: 100, marginLeft: 32, marginRight: 24, marginTop: 10, marginBottom: 10, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(25,118,210,0.08)", objectFit: "contain" }} />
+    <div style={{
+      minHeight: "100vh",
+      background: "#fff",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      fontFamily: "Segoe UI, Arial, sans-serif",
+      width: "100vw",
+      overflowX: "hidden"
+    }}>
+      {/* Header */}
+      <header style={{
+        width: "100vw",
+        background: RED,
+        color: WHITE,
+        padding: 0,
+        textAlign: "center",
+        boxShadow: "0 2px 16px rgba(183,28,28,0.13)",
+        minHeight: 90,
+        display: "flex",
+        alignItems: "center",
+        position: "relative"
+      }}>
+        <img src="/Lg.png" alt="KL University Logo" style={{
+          height: 90,
+          marginLeft: 32,
+          marginRight: 24,
+          marginTop: 10,
+          marginBottom: 10,
+          background: WHITE,
+          borderRadius: "50%",
+          boxShadow: "0 2px 8px rgba(183,28,28,0.08)",
+          objectFit: "contain"
+        }} />
         <div style={{ flex: 1, textAlign: "center" }}>
-            <h1 style={{ margin: 0, fontSize: 44, letterSpacing: 2, fontWeight: 500, textTransform: "uppercase" }}>MARKMEE</h1>
-          <div style={{ fontSize: 20, letterSpacing: 1, marginTop: 4, fontWeight: 500 }}>
-            student portal - <span style={{ color: "#1976d2", background: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>DEPARTMENT OF AI&DS</span>
+          <h1 style={{
+            margin: 0,
+            fontSize: 44,
+            letterSpacing: 2,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em"
+          }}>MARKMEE</h1>
+          <div style={{
+            fontSize: 20,
+            letterSpacing: 1,
+            marginTop: 4,
+            fontWeight: 500
+          }}>
+            Student Portal <span style={{
+              color: RED,
+              background: WHITE,
+              padding: "2px 8px",
+              borderRadius: 6,
+              fontWeight: 700
+            }}>DEPARTMENT OF AI&DS</span>
           </div>
         </div>
       </header>
 
-      <nav style={{ background: "#f5f5f5", padding: "12px 0", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", width: "100%", marginBottom: 20 }}>
-        <Link to="/" style={{ color: "#666", textDecoration: "none", margin: "0 16px", fontWeight: 500 }}>Home</Link>
-        <Link to="/faculty" style={{ color: "#b71c1c", textDecoration: "none", margin: "0 16px", fontWeight: 500 }}>Faculty</Link>
-        <span style={{ color: "#1976d2", margin: "0 16px", fontWeight: 600 }}>Student ({currentStudent.id})</span>
-        <button onClick={handleLogout} style={{ background: "#f44336", color: "#fff", border: "none", borderRadius: 4, padding: "4px 12px", fontSize: 12, cursor: "pointer", marginLeft: 8 }}>Logout</button>
-      </nav>
-
-      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: "100vw", padding: 20 }}>
-        <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 4px 32px rgba(25,118,210,0.13)", padding: "32px 24px", minWidth: 340, maxWidth: 480, width: "100%", textAlign: "center" }}>
-          <h2 style={{ color: "#1976d2", marginBottom: 16, fontWeight: 600 }}>📱 QR Code Attendance Scanner</h2>
-
-          <div style={{ background: "#e3f2fd", border: "2px solid #1976d2", borderRadius: 12, padding: 16, marginBottom: 24, textAlign: "left" }}>
-            <div style={{ fontSize: 14, color: "#1976d2", fontWeight: 600, marginBottom: 8 }}>👤 Logged in as:</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1976d2", marginBottom: 4 }}>{currentStudent.name}</div>
-            <div style={{ fontSize: 14, color: "#666" }}>
-              ID: {currentStudent.id} | {currentStudent.department} - {currentStudent.year}
+      <main style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100vw",
+        padding: 20,
+        overflowX: "hidden"
+      }}>
+        <div style={{
+          background: WHITE,
+          borderRadius: 20,
+          boxShadow: "0 4px 32px rgba(25,118,210,0.13)",
+          padding: "32px 24px",
+          minWidth: 340,
+          maxWidth: 480,
+          width: "100%",
+          textAlign: "center"
+        }}>
+          {/* Removed the heading here */}
+          <div style={{
+            background: "#e3f2fd",
+            border: "2px solid #1976d2",
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 24,
+            textAlign: "left"
+          }}>
+            <div style={{
+              fontSize: 14,
+              color: "#1976d2",
+              fontWeight: 600,
+              marginBottom: 8
+            }}>👤 Logged in as:</div>
+            <div style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: "#1976d2",
+              marginBottom: 4
+            }}>Student 001</div>
+            <div style={{
+              fontSize: 14,
+              color: "#666"
+            }}>
+              ID: 2410080001 | AI&DS - 2024
             </div>
           </div>
 
-          <div
-            style={{
-              background: window.isSecureContext ? "#e8f5e8" : "#fff3cd",
-              border: `1px solid ${window.isSecureContext ? "#4caf50" : "#ffc107"}`,
-              borderRadius: 8,
-              padding: "8px 12px",
-              marginBottom: 20,
-              fontSize: 12,
-              color: window.isSecureContext ? "#2e7d32" : "#856404"
-            }}
-          >
-            🔒 {window.isSecureContext
-              ? "Secure HTTPS Connection"
-              : window.location.hostname === "localhost"
-                ? "HTTP (localhost) - Camera may work"
-                : "HTTP - Camera needs HTTPS remotely"}
-          </div>
-
           {cameraError && (
-            <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 8, padding: 12, marginBottom: 20, color: "#856404", fontSize: 14 }}>
+            <div style={{
+              background: "#fff3cd",
+              border: "1px solid #ffc107",
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 20,
+              color: "#856404",
+              fontSize: 14
+            }}>
               <strong>⚠️ Camera Issue:</strong><br />{cameraError}
               <br /><small>You can still try the buttons below.</small>
             </div>
           )}
 
             <div style={{ marginBottom: 20, textAlign: "center" }}>
-              <div style={{ background: "#f8f9fa", border: "2px dashed #1976d2", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+              <div style={{
+                background: "#f8f9fa",
+                border: "2px dashed #1976d2",
+                borderRadius: 12,
+                padding: 20,
+                marginBottom: 16
+              }}>
+                {/* ...existing scanner state UI... */}
+                {isScanning && (
+                  <div>
+                    <div style={{
+                      position: "relative",
+                      display: "inline-block",
+                      marginBottom: 12,
+                      overflow: "hidden",
+                      borderRadius: 8
+                    }}>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        style={{
+                          width: "100%",
+                          maxWidth: 320,
+                          height: 240,
+                          border: "3px solid #4caf50",
+                          borderRadius: 8,
+                          background: "#000",
+                          objectFit: "cover",
+                          transition: "transform 0.3s ease"
+                        }}
+                        onError={(e) => {
+                          setCameraError("Video playback error.");
+                        }}
+                      />
+                      <div style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%,-50%)",
+                        width: "60%",
+                        height: "60%",
+                        border: "2px solid #4caf50",
+                        borderRadius: 8,
+                        boxShadow: "0 0 0 9999px rgba(0,0,0,0.3)",
+                        pointerEvents: "none"
+                      }} />
+                      <div style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        background: "rgba(0,0,0,0.7)",
+                        color: "#fff",
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>🔍 {currentZoom.toFixed(1)}x</div>
+                    </div>
+
+                    {/* Improved Zoom Controls */}
+                    <div style={{
+                      background: "#fff3f3",
+                      border: `1.5px solid ${RED}`,
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 12,
+                      marginTop: 8
+                    }}>
+                      <div style={{
+                        fontSize: 13,
+                        color: RED,
+                        fontWeight: 600,
+                        marginBottom: 8
+                      }}>Zoom</div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={10}
+                        step={0.1}
+                        value={currentZoom}
+                        onChange={e => handleZoom(Number(e.target.value))}
+                        style={{
+                          width: "80%",
+                          accentColor: RED,
+                          marginBottom: 6
+                        }}
+                      />
+                      <div style={{
+                        fontSize: 12,
+                        color: "#333",
+                        marginBottom: 4
+                      }}>
+                        Current: <b>{currentZoom.toFixed(1)}x</b>
+                        <button
+                          type="button"
+                          onClick={() => handleZoom(1)}
+                          style={{
+                            marginLeft: 16,
+                            background: RED,
+                            color: WHITE,
+                            border: "none",
+                            borderRadius: 6,
+                            padding: "2px 10px",
+                            fontSize: 12,
+                            cursor: "pointer"
+                          }}
+                        >Reset</button>
+                      </div>
+                      <div style={{
+                        fontSize: 10,
+                        color: "#888"
+                      }}>Drag slider for smooth zoom (1x–10x)</div>
+                    </div>
+                    {/* ...rest of scanner controls... */}
+                  </div>
+                )}
+
                 {!isScanning && !scannedCode && !isLoading && (
                   <div>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>📷</div>
-                    <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
+                    <div style={{
+                      fontSize: 48,
+                      marginBottom: 12
+                    }}>📷</div>
+                    <p style={{
+                      color: "#666",
+                      marginBottom: 16,
+                      fontSize: 14
+                    }}>
                       {window.isSecureContext ? "Scan QR code to mark attendance" : "HTTPS required for camera access"}
                     </p>
                     {(window.isSecureContext || window.location.hostname === "localhost") ? (
                       <div style={{ marginBottom: 16 }}>
                         <button
                           type="button"
-                          onClick={startScanning}
-                          style={{ background: "#4caf50", color: "#fff", border: "none", borderRadius: 8, padding: "12px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginRight: 8, marginBottom: 8 }}
+                          onClick={() => { openFullScreen(); startScanning(); }}
+                          style={{
+                            background: "#b71c1c",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "14px 28px",
+                            fontSize: 16,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            marginRight: 8,
+                            marginBottom: 8
+                          }}
                         >
-                          🎯 Start QR Scanner
+                          🎯 Start Scanner (Full Screen)
                         </button>
                         <button
                           type="button"
                           onClick={testCameraDirectly}
-                          style={{ background: "#ff9800", color: "#fff", border: "none", borderRadius: 8, padding: "12px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}
+                          style={{
+                            background: "#ff9800",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "12px 20px",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            marginBottom: 8
+                          }}
                         >
                           🔧 Test Camera
                         </button>
                       </div>
                     ) : (
-                      <div style={{ background: "#ffebee", border: "1px solid #f44336", borderRadius: 8, padding: 12, color: "#c62828", fontSize: 14 }}>
+                      <div style={{
+                        background: "#ffebee",
+                        border: "1px solid #f44336",
+                        borderRadius: 8,
+                        padding: 12,
+                        color: "#c62828",
+                        fontSize: 14
+                      }}>
                         ⚠️ Use HTTPS for camera access.
                       </div>
                     )}
                   </div>
                 )}
 
-                {isScanning && (
-                  <div>
-                    <div style={{ position: "relative", display: "inline-block", marginBottom: 12, overflow: "hidden", borderRadius: 8 }}>
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        style={{ width: "100%", maxWidth: 320, height: 240, border: "3px solid #4caf50", borderRadius: 8, background: "#000", objectFit: "cover", transition: "transform 0.3s ease" }}
-                        onError={(e) => {
-                          console.error("Video error:", e);
-                          setCameraError("Video playback error.");
-                        }}
-                      />
-                      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "60%", height: "60%", border: "2px solid #4caf50", borderRadius: 8, boxShadow: "0 0 0 9999px rgba(0,0,0,0.3)", pointerEvents: "none" }} />
-                      <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.7)", color: "#fff", padding: "4px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>🔍 {currentZoom}x</div>
-                    </div>
-
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ background: "#e3f2fd", border: "1px solid #2196f3", borderRadius: 6, padding: 8, marginBottom: 8 }}>
-                        <div style={{ fontSize: 12, color: "#1976d2", fontWeight: 600, marginBottom: 4 }}>🔍 Zoom Controls (Current {currentZoom}x)</div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: 3, marginBottom: 4 }}>
-                          {[1, 1.5, 2, 2.5, 3].map(z => (
-                            <button key={z} type="button" onClick={() => handleZoom(z)}
-                              style={{ background: currentZoom === z ? "#1976d2" : "#2196f3", color: "#fff", border: "none", borderRadius: 4, padding: "4px 6px", fontSize: 10, cursor: "pointer", minWidth: 28 }}>
-                              {z}x
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: 3, marginBottom: 6 }}>
-                          {[4, 5, 6, 7, 8].map(z => (
-                            <button key={z} type="button" onClick={() => handleZoom(z)}
-                              style={{ background: currentZoom === z ? "#1976d2" : "#2196f3", color: "#fff", border: "none", borderRadius: 4, padding: "4px 6px", fontSize: 10, cursor: "pointer", minWidth: 28 }}>
-                              {z}x
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: 3, marginBottom: 6 }}>
-                          {[9, 10].map(z => (
-                            <button key={z} type="button" onClick={() => handleZoom(z)}
-                              style={{ background: currentZoom === z ? "#1976d2" : "#ff5722", color: "#fff", border: "none", borderRadius: 4, padding: "4px 8px", fontSize: 10, cursor: "pointer", minWidth: 32 }}>
-                              {z}x
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{ fontSize: 10, color: "#666", textAlign: "center" }}>High zoom (6x+) may reduce clarity.</div>
-                      </div>
-                    </div>
-
-                    <div style={{ background: "#e8f5e8", color: "#2e7d32", padding: "8px 12px", borderRadius: 6, fontSize: 14, border: "1px solid #4caf50", marginBottom: 12 }}>
-                      Scanning... Point at QR code.
-                    </div>
-
-                    <div style={{ marginBottom: 12 }}>
-                      <button type="button" onClick={stopScanning} style={{ background: "#f44336", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 14, cursor: "pointer", marginRight: 8 }}>
-                        ⏹️ Stop
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          stopScanning();
-                          setTimeout(() => startScanning(), 400);
-                        }}
-                        style={{ background: "#ff9800", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 14, cursor: "pointer" }}
-                      >
-                        🔄 Retry
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {isLoading && (
                   <div>
-                    <div style={{ fontSize: 48, color: "#ff9800", marginBottom: 12 }}>⏳</div>
-                    <div style={{ background: "#fff3cd", border: "2px solid #ffc107", borderRadius: 8, padding: 12, marginBottom: 12, color: "#856404", fontWeight: 600 }}>
+                    <div style={{
+                      fontSize: 48,
+                      color: "#ff9800",
+                      marginBottom: 12
+                    }}>⏳</div>
+                    <div style={{
+                      background: "#fff3cd",
+                      border: "2px solid #ffc107",
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 12,
+                      color: "#856404",
+                      fontWeight: 600
+                    }}>
                       📤 Marking attendance...
                     </div>
                   </div>
@@ -656,10 +698,22 @@ export default function StudentPage() {
 
                 {!isScanning && !isLoading && message && (
                   <div>
-                    <div style={{ fontSize: 48, color: isSuccess ? "#4caf50" : "#f44336", marginBottom: 12 }}>
+                    <div style={{
+                      fontSize: 48,
+                      color: isSuccess ? "#4caf50" : "#f44336",
+                      marginBottom: 12
+                    }}>
                       {isSuccess ? "✅" : "❌"}
                     </div>
-                    <div style={{ background: isSuccess ? "#e8f5e8" : "#ffebee", border: `2px solid ${isSuccess ? "#4caf50" : "#f44336"}`, borderRadius: 8, padding: 12, marginBottom: 12, color: isSuccess ? "#2e7d32" : "#c62828", fontWeight: 600 }}>
+                    <div style={{
+                      background: isSuccess ? "#e8f5e8" : "#ffebee",
+                      border: `2px solid ${isSuccess ? "#4caf50" : "#f44336"}`,
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 12,
+                      color: isSuccess ? "#2e7d32" : "#c62828",
+                      fontWeight: 600
+                    }}>
                       {message}
                     </div>
                     <button
@@ -669,7 +723,15 @@ export default function StudentPage() {
                         setIsSuccess(false);
                         setScannedCode("");
                       }}
-                      style={{ background: "#1976d2", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 14, cursor: "pointer" }}
+                      style={{
+                        background: "#1976d2",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "8px 16px",
+                        fontSize: 14,
+                        cursor: "pointer"
+                      }}
                     >
                       🔄 Scan Another
                     </button>
@@ -678,9 +740,22 @@ export default function StudentPage() {
               </div>
             </div>
 
-          <div style={{ marginTop: 20, padding: 12, background: "#f3f9ff", borderRadius: 8, fontSize: 12, color: "#1976d2", textAlign: "left" }}>
+          {/* Remove this instructions block */}
+          {/* <div style={{
+            marginTop: 20,
+            padding: 12,
+            background: "#f3f9ff",
+            borderRadius: 8,
+            fontSize: 12,
+            color: "#1976d2",
+            textAlign: "left"
+          }}>
             <strong>📋 Instructions:</strong>
-            <ol style={{ margin: "6px 0", paddingLeft: 16, fontSize: 11 }}>
+            <ol style={{
+              margin: "6px 0",
+              paddingLeft: 16,
+              fontSize: 11
+            }}>
               <li>Login with your ID and password</li>
               <li>Click Start QR Scanner</li>
               <li>Align QR inside the frame</li>
@@ -689,9 +764,197 @@ export default function StudentPage() {
               <li>If 400 errors persist, refresh and retry</li>
             </ol>
             <em>QR codes expire quickly. One scan per session.</em>
-          </div>
+          </div> */}
         </div>
       </main>
+
+      {/* Fullscreen Scanner Overlay */}
+      {isFullScreen && isScanning && (
+        <div
+          id="fullscreen-scanner"
+          style={{
+            position: "fixed",
+            zIndex: 9999,
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: "#000c",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <button
+            onClick={closeFullScreen}
+            style={{
+              position: "absolute",
+              top: 24,
+              right: 32,
+              background: "#b71c1c",
+              color: "#fff",
+              border: "none",
+              borderRadius: "50%",
+              width: 44,
+              height: 44,
+              fontSize: 28,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(183,28,28,0.13)"
+            }}
+            aria-label="Close Scanner"
+          >✖</button>
+          <div style={{
+            background: "#222",
+            borderRadius: 16,
+            padding: 16,
+            boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center"
+          }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: "90vw",
+                maxWidth: 600,
+                height: "60vh",
+                border: "4px solid #b71c1c",
+                borderRadius: 12,
+                background: "#000",
+                objectFit: "cover",
+                transition: "transform 0.3s ease"
+              }}
+            />
+            <div style={{
+              position: "relative",
+              width: "90vw",
+              maxWidth: 600,
+              marginTop: 12
+            }}>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={0.1}
+                value={currentZoom}
+                onChange={e => handleZoom(Number(e.target.value))}
+                style={{
+                  width: "100%",
+                  accentColor: RED,
+                  marginBottom: 6
+                }}
+              />
+              <div style={{
+                color: "#fff",
+                fontSize: 16,
+                marginTop: 4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                Zoom: <b style={{ margin: "0 8px" }}>{currentZoom.toFixed(1)}x</b>
+                <button
+                  type="button"
+                  onClick={() => handleZoom(1)}
+                  style={{
+                    marginLeft: 16,
+                    background: "#b71c1c",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "2px 14px",
+                    fontSize: 14,
+                    cursor: "pointer"
+                  }}
+                >Reset</button>
+              </div>
+              <div style={{
+                fontSize: 11,
+                color: "#eee",
+                marginTop: 2,
+                textAlign: "center"
+              }}>Pinch or scroll to zoom (1x–10x)</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Navigation link with animated underline and color
+function NavLink({ to, label, active }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        color: active ? "#fff" : RED,
+        background: active ? RED : WHITE,
+        borderRadius: 8,
+        padding: "6px 18px",
+        textDecoration: "none",
+        position: "relative",
+        transition: "background 0.2s, color 0.2s",
+        boxShadow: active ? "0 2px 8px rgba(183,28,28,0.13)" : "none"
+      }}
+      onMouseOver={e => {
+        if (!active) e.currentTarget.style.background = RED_LIGHT;
+      }}
+      onMouseOut={e => {
+        if (!active) e.currentTarget.style.background = WHITE;
+      }}
+    >
+      {label}
+      {active && (
+        <span style={{
+          display: "block",
+          height: 3,
+          background: WHITE,
+          borderRadius: 2,
+          width: "80%",
+          margin: "4px auto 0 auto",
+          transition: "width 0.2s"
+        }} />
+      )}
+    </Link>
+  );
+}
+
+// Form field with floating label effect
+function FormField({ label, value, onChange, placeholder, disabled, type }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <label style={{
+        display: "block",
+        color: RED,
+        fontWeight: 600,
+        marginBottom: 8,
+        fontSize: 15
+      }}>{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required
+        disabled={disabled}
+        style={{
+          width: "100%",
+          padding: "14px 16px",
+          border: `2px solid ${RED}`,
+          borderRadius: 8,
+          fontSize: 16,
+          background: disabled ? "#f5f5f5" : WHITE,
+          color: "#000",
+          outline: "none",
+          transition: "border-color 0.2s",
+          boxShadow: "0 2px 8px rgba(183,28,28,0.06)"
+        }}
+        placeholder={placeholder}
+        onFocus={e => e.target.style.borderColor = RED_DARK}
+        onBlur={e => e.target.style.borderColor = RED}
+      />
     </div>
   );
 }
