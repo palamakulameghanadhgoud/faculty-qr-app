@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import FacultyPage from './FacultyPage';
 import StudentLogin from './StudentLogin';
 import { useEffect, useState } from 'react';
@@ -8,11 +8,9 @@ const WHITE = "#fff";
 const ORBIT_SPEED_SECONDS = 18;
 
 export default function App() {
-  // Modal state and intended route
   const [showModal, setShowModal] = useState(false);
   const [intendedRoute, setIntendedRoute] = useState("/");
 
-  // Custom wrapper to pass modal control to HomePage
   return (
     <Router>
       <AppRoutes
@@ -28,7 +26,6 @@ export default function App() {
 function AppRoutes({ showModal, setShowModal, intendedRoute, setIntendedRoute }) {
   const location = useLocation();
 
-  // If modal is open, always render HomePage (so modal overlays it)
   return (
     <>
       <Routes>
@@ -59,7 +56,6 @@ function AppRoutes({ showModal, setShowModal, intendedRoute, setIntendedRoute })
           }
         />
       </Routes>
-      {/* Modal is rendered at the top level so it overlays all routes */}
       {showModal && (
         <LoginModal
           setShowModal={setShowModal}
@@ -90,18 +86,15 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
   const radius = 170;
   const duration = ORBIT_SPEED_SECONDS;
 
-  // For moving lines, we need to track the current angle for each button
   const [, setTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 1000 / 60); // 60fps
+    const interval = setInterval(() => setTick(t => t + 1), 1000 / 60);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate current angle for each button
   const now = performance.now() / 1000;
   const getAngle = (phase) => ((now / duration) * 2 * Math.PI + phase) % (2 * Math.PI);
 
-  // Get button positions
   const positions = ringItems.map(item => {
     const angle = getAngle(item.phase);
     return {
@@ -110,6 +103,9 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
       angle,
     };
   });
+
+  const [showAbout, setShowAbout] = useState(false);
+  const [showContact, setShowContact] = useState(false);
 
   return (
     <div
@@ -125,7 +121,6 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
         padding: 0,
       }}
     >
-      {/* Top Bar */}
       <header
         style={{
           width: "100vw",
@@ -184,10 +179,7 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               fontWeight: 600,
               cursor: "pointer"
             }}
-            onClick={() => {
-              setIntendedRoute("/");
-              setShowModal(true);
-            }}
+            onClick={() => setShowAbout(true)}
           >
             About Us
           </span>
@@ -199,17 +191,13 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               fontWeight: 600,
               cursor: "pointer"
             }}
-            onClick={() => {
-              setIntendedRoute("/");
-              setShowModal(true);
-            }}
+            onClick={() => setShowContact(true)}
           >
             Contact Us
           </span>
         </nav>
       </header>
 
-      {/* Main Content */}
       <main
         style={{
           flex: 1,
@@ -233,7 +221,6 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
             justifyContent: "center",
           }}
         >
-          {/* Moving lines */}
           <svg
             width={2 * center}
             height={2 * center}
@@ -245,7 +232,6 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               zIndex: 1,
             }}
           >
-            {/* Line from logo to Student */}
             <line
               x1={center}
               y1={center}
@@ -255,7 +241,6 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               strokeWidth="2"
               strokeDasharray="6,6"
             />
-            {/* Line from logo to Faculty */}
             <line
               x1={center}
               y1={center}
@@ -266,16 +251,6 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               strokeDasharray="6,6"
             />
           </svg>
-
-          {/* Orbiting Buttons */}
-          <style>
-            {`
-              @keyframes orbit-cw {
-                0%   { transform: rotate(0deg)   translate(${radius}px) rotate(0deg);}
-                100% { transform: rotate(360deg) translate(${radius}px) rotate(-360deg);}
-              }
-            `}
-          </style>
           {ringItems.map((item, i) => (
             <span
               key={i}
@@ -328,14 +303,9 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
               <span style={{ fontSize: 22, fontWeight: 700 }}>{item.label}</span>
             </span>
           ))}
-
-          {/* Centered Logo with shadow and modal trigger */}
           <LoginModalTrigger center={center} setShowModal={setShowModal} setIntendedRoute={setIntendedRoute} />
-
         </div>
       </main>
-
-      {/* Footer */}
       <footer
         style={{
           width: "100vw",
@@ -348,13 +318,190 @@ function HomePage({ showModal, setShowModal, setIntendedRoute }) {
           letterSpacing: 1,
         }}
       >
-        &copy; {new Date().getFullYear()} KL University | All Rights Reserved
+        &copy; {new Date().getFullYear()} KL University | All Rights Reserved | Designed by &nbsp; 
+        <a
+          href="https://github.com/palamakulameghanadhgoud"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#fff", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          <svg
+            height="18"
+            width="18"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            style={{ verticalAlign: "middle" }}
+          >
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+              0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
+              -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2
+              -3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82
+              .64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08
+              2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
+              1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          @meghanadh @mohi_ud_din92 @abhiiii746 @deepthi @abhinavsai
+        </a>
       </footer>
+      {showAbout && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              boxShadow: "0 8px 32px rgba(183,28,28,0.18)",
+              padding: "32px 28px 24px 28px",
+              minWidth: 350,
+              maxWidth: 500,
+              width: "90vw",
+              position: "relative",
+              border: `3px solid ${RED}`,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowAbout(false)}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                background: "#fff",
+                border: `2px solid #ccc`,
+                borderRadius: "50%",
+                width: 32,
+                height: 32,
+                fontSize: 20,
+                color: "#b71c1c",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+              }}
+              aria-label="Close"
+            >×</button>
+            <h2 style={{ color: RED, marginBottom: 16, fontWeight: 700 }}>About Us</h2>
+            <div style={{ color: "#222", fontSize: 16, lineHeight: 1.7, textAlign: "left", maxWidth: 420 }}>
+              We are a passionate team of KL University students—
+              <b>mohiuddin ahemed</b>, <b>Abhilash</b>, <b>abhinav sai</b>, <b>Deepthi Priyanka</b>, and <b>meghanadhgoud</b>—brought together by our shared curiosity and drive to build practical tech solutions.
+              <br /><br />
+              As part of our Object-Oriented Programming (OOPs) project, we designed and developed a <b>QR-based Attendance System</b> that streamlines classroom attendance with speed, accuracy, and minimal manual effort.
+              <br /><br />
+              Our system leverages the principles of OOP to ensure modularity, scalability, and clean code architecture. By integrating QR scanning with real-time data logging, we aimed to solve a common campus challenge—making attendance smarter and more efficient for both students and faculty.
+              <br /><br />
+              This project reflects our commitment to innovation, teamwork, and applying classroom concepts to real-world use cases. We’re proud to have built something that’s not just functional, but future-ready.
+            </div>
+          </div>
+        </div>
+      )}
+      {showContact && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+          onClick={() => setShowContact(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              boxShadow: "0 8px 32px rgba(183,28,28,0.18)",
+              padding: "32px 28px 24px 28px",
+              minWidth: 350,
+              maxWidth: 500,
+              width: "90vw",
+              position: "relative",
+              border: `3px solid ${RED}`,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowContact(false)}
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                background: "#fff",
+                border: `2px solid #ccc`,
+                borderRadius: "50%",
+                width: 32,
+                height: 32,
+                fontSize: 20,
+                color: "#b71c1c",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+              }}
+              aria-label="Close"
+            >×</button>
+            <h2 style={{ color: RED, marginBottom: 16, fontWeight: 700 }}>Contact Us</h2>
+            <div style={{ color: "#222", fontSize: 16, lineHeight: 1.7, textAlign: "left", maxWidth: 420 }}>
+              <ul style={{ paddingLeft: 18, margin: 0 }}>
+                <li>
+                  <a href="mailto:2410080026@klh.edu.in" style={{ color: "#1976d2", textDecoration: "underline" }}>
+                    2410080026@klh.edu.in
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:2410080054@klh.edu.in" style={{ color: "#1976d2", textDecoration: "underline" }}>
+                    2410080054@klh.edu.in
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:2410080085@klh.edu.in" style={{ color: "#1976d2", textDecoration: "underline" }}>
+                    2410080085@klh.edu.in
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:2410080005@klh.edu.in" style={{ color: "#1976d2", textDecoration: "underline" }}>
+                    2410080005@klh.edu.in
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:2410080031@klh.edu.in" style={{ color: "#1976d2", textDecoration: "underline" }}>
+                    2410080031@klh.edu.in
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Centered logo trigger for modal
 function LoginModalTrigger({ center, setShowModal, setIntendedRoute }) {
   return (
     <div
@@ -395,7 +542,6 @@ function LoginModalTrigger({ center, setShowModal, setIntendedRoute }) {
   );
 }
 
-// Login modal with credential check and auto-routing
 function LoginModal({ setShowModal, intendedRoute }) {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -404,22 +550,13 @@ function LoginModal({ setShowModal, intendedRoute }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Captcha state
   const [captcha, setCaptcha] = useState("");
   const [captchaInput, setCaptchaInput] = useState("");
 
-  // 2FA state
-  const [isFaculty2FA, setIsFaculty2FA] = useState(false);
-  const [faculty2FACode, setFaculty2FACode] = useState("");
-  const [faculty2FAInput, setFaculty2FAInput] = useState("");
-  const [faculty2FAError, setFaculty2FAError] = useState("");
-
-  // Load credentials from both files
   const [facultyCreds, setFacultyCreds] = useState({});
   const [studentCreds, setStudentCreds] = useState({});
   const [loaded, setLoaded] = useState(false);
 
-  // Generate a random captcha string
   function generateCaptcha(length = 6) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     let result = '';
@@ -427,11 +564,6 @@ function LoginModal({ setShowModal, intendedRoute }) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
-  }
-
-  // Generate a random 6-digit 2FA code
-  function generate2FACode() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
   useEffect(() => {
@@ -471,12 +603,10 @@ function LoginModal({ setShowModal, intendedRoute }) {
     loadCreds();
   }, []);
 
-  // Handle login
   const handleLogin = async (e) => {
     e.preventDefault();
     setTouched({ username: true, password: true, captcha: true });
     setError("");
-    setFaculty2FAError("");
     if (!username.trim() || !password.trim()) {
       setError("Please enter both username and password.");
       return;
@@ -495,20 +625,23 @@ function LoginModal({ setShowModal, intendedRoute }) {
     const uname = username.trim().toLowerCase();
     const pwd = password.trim();
 
-    // Check faculty
     if (facultyCreds[uname] && facultyCreds[uname] === pwd) {
-      // 2FA step for faculty
       setLoading(false);
-      const code = generate2FACode();
-      setFaculty2FACode(code);
-      setIsFaculty2FA(true);
-      // In production, send code via email/SMS. For demo, show it in UI.
+      setShowModal(false);
+      navigate("/faculty");
       return;
     }
-    // Check student
     if (studentCreds[uname] && studentCreds[uname] === pwd) {
       setLoading(false);
       setShowModal(false);
+      localStorage.setItem("student_id", uname);
+      let studentName = "Student";
+      if (/^\d{10}$/.test(uname)) {
+        studentName = "Student " + uname.slice(-3);
+      } else {
+        studentName = uname;
+      }
+      localStorage.setItem("student_name", studentName);
       navigate("/student");
       return;
     }
@@ -518,159 +651,11 @@ function LoginModal({ setShowModal, intendedRoute }) {
     setCaptchaInput("");
   };
 
-  // Handle faculty 2FA submit
-  const handleFaculty2FA = (e) => {
-    e.preventDefault();
-    setFaculty2FAError("");
-    if (faculty2FAInput.trim() === faculty2FACode) {
-      setShowModal(false);
-      navigate("/faculty");
-    } else {
-      setFaculty2FAError("Invalid 2FA code. Please try again.");
-    }
-  };
-
-  // Refresh captcha handler
   const handleRefreshCaptcha = () => {
     setCaptcha(generateCaptcha());
     setCaptchaInput("");
     setTouched(t => ({ ...t, captcha: false }));
   };
-
-  // 2FA step UI
-  if (isFaculty2FA) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          background: "rgba(0,0,0,0.35)",
-          zIndex: 9999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}
-        onClick={() => setShowModal(false)}
-      >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 20,
-            boxShadow: "0 8px 32px rgba(183,28,28,0.18)",
-            padding: "32px 28px 24px 28px",
-            minWidth: 350,
-            maxWidth: 400,
-            width: "100%",
-            position: "relative",
-            border: `3px solid ${RED}`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center"
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Close button */}
-          <button
-            onClick={() => setShowModal(false)}
-            style={{
-              position: "absolute",
-              top: 16,
-              right: 16,
-              background: "#fff",
-              border: `2px solid #ccc`,
-              borderRadius: "50%",
-              width: 32,
-              height: 32,
-              fontSize: 20,
-              color: "#b71c1c",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
-            }}
-            aria-label="Close"
-          >×</button>
-          {/* Logo */}
-          <div style={{
-            position: "absolute",
-            top: -38,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "#fff",
-            borderRadius: "50%",
-            border: `3px solid ${RED}`,
-            width: 64,
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.10)"
-          }}>
-            <img src="/kl.jpg" alt="KL Logo" style={{ width: 48, height: 48, borderRadius: "50%" }} />
-          </div>
-          <div style={{ height: 32 }} />
-          <form style={{ width: "100%" }} onSubmit={handleFaculty2FA} autoComplete="off">
-            <label style={{ color: RED, fontWeight: 700, fontSize: 17, marginBottom: 4, display: "block" }}>
-              Enter 2FA Code
-            </label>
-            <input
-              type="text"
-              placeholder="Enter the 6-digit code"
-              value={faculty2FAInput}
-              onChange={e => setFaculty2FAInput(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px 10px",
-                border: `2px solid #b71c1c`,
-                borderRadius: 8,
-                fontSize: 16,
-                marginBottom: 6,
-                marginTop: 2,
-                background: "#fff",
-                letterSpacing: "0.3em",
-                textAlign: "center"
-              }}
-              maxLength={6}
-              autoFocus
-            />
-            {/* For demo: show the code */}
-            <div style={{
-              color: "#1976d2",
-              fontSize: 15,
-              margin: "10px 0 16px 0",
-              textAlign: "center"
-            }}>
-              <b>Demo 2FA code:</b> <span style={{ letterSpacing: "0.2em" }}>{faculty2FACode}</span>
-            </div>
-            {faculty2FAError && (
-              <div style={{ color: "#b71c1c", fontSize: 13, marginBottom: 10 }}>{faculty2FAError}</div>
-            )}
-            <button
-              type="submit"
-              style={{
-                width: "100%",
-                background: "#1976d2",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                padding: "14px",
-                fontSize: 18,
-                fontWeight: 600,
-                cursor: "pointer",
-                marginTop: 8
-              }}
-            >
-              Verify & Login
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -705,7 +690,6 @@ function LoginModal({ setShowModal, intendedRoute }) {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Close button */}
         <button
           onClick={() => setShowModal(false)}
           style={{
@@ -727,7 +711,6 @@ function LoginModal({ setShowModal, intendedRoute }) {
           }}
           aria-label="Close"
         >×</button>
-        {/* Logo */}
         <div style={{
           position: "absolute",
           top: -38,
@@ -793,18 +776,20 @@ function LoginModal({ setShowModal, intendedRoute }) {
             <input type="checkbox" id="rememberMe" style={{ marginRight: 8 }} />
             <label htmlFor="rememberMe" style={{ fontWeight: 600, fontSize: 15 }}>Remember Me</label>
           </div>
-          {/* Captcha */}
           <div style={{ marginBottom: 10, marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{
               display: "inline-block",
-              fontFamily: "cursive",
-              fontSize: 32,
+              fontFamily: "monospace, Arial, sans-serif",
+              fontSize: 28,
               fontWeight: 700,
-              letterSpacing: 2,
-              background: "#eee",
-              padding: "4px 16px",
+              letterSpacing: 4,
+              background: "#f5f5f5",
+              padding: "10px 18px",
               borderRadius: 8,
-              userSelect: "none"
+              userSelect: "none",
+              color: "#222",
+              minWidth: 140,
+              textAlign: "center"
             }}>{captcha}</span>
             <button
               type="button"
@@ -878,7 +863,7 @@ function LoginModal({ setShowModal, intendedRoute }) {
           fontSize: 15,
           textAlign: "center"
         }}>
-          © Copyright 2019 by K L Deemed to be University
+          © Copyright 2025 by K L Deemed to be University
         </div>
       </div>
     </div>

@@ -8,6 +8,10 @@ const RED_LIGHT = "#fff3f3";
 const WHITE = "#fff";
 
 export default function StudentPage() {
+  // Add these lines at the top:
+  const studentId = localStorage.getItem("student_id") || "";
+  const studentName = localStorage.getItem("student_name") || "";
+
   // Attendance / scanner states
   const [message, setMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
@@ -222,18 +226,18 @@ export default function StudentPage() {
 
     const API_BASE = resolveApiBase();
 
-    // Primary assumed payload (most backends need all three fields)
+    // Use studentId and studentName from localStorage
     const basePayload = {
       qr_code: qrCode,
-      student_id: "2410080001", // Use a default or dummy student ID
-      student_name: "Student 001" // Use a default or dummy student name
+      student_id: studentId,
+      student_name: studentName
     };
 
     // Fallback key variants if first returns 400
     const variantPayloads = [
       basePayload,
-      { qr: qrCode, student_id: "2410080001", student_name: "Student 001" },
-      { code: qrCode, student_id: "2410080001", student_name: "Student 001" }
+      { qr: qrCode, student_id: studentId, student_name: studentName },
+      { code: qrCode, student_id: studentId, student_name: studentName }
     ];
 
     let success = false;
@@ -445,7 +449,7 @@ export default function StudentPage() {
           width: "100%",
           textAlign: "center"
         }}>
-          {/* Removed the heading here */}
+          {/* Show logged in student info */}
           <div style={{
             background: "#e3f2fd",
             border: "2px solid #1976d2",
@@ -465,12 +469,12 @@ export default function StudentPage() {
               fontWeight: 600,
               color: "#1976d2",
               marginBottom: 4
-            }}>Student 001</div>
+            }}>{studentName}</div>
             <div style={{
               fontSize: 14,
               color: "#666"
             }}>
-              ID: 2410080001 | AI&DS - 2024
+              ID: {studentId} | AI&DS - 2024
             </div>
           </div>
 
