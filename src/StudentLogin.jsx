@@ -388,44 +388,38 @@ export default function StudentPage() {
         padding: 0,
         textAlign: "center",
         boxShadow: "0 2px 16px rgba(183,28,28,0.13)",
-        minHeight: 90,
+        minHeight: 60, // reduced
         display: "flex",
         alignItems: "center",
         position: "relative"
       }}>
-        <img src="/Lg.png" alt="KL University Logo" style={{
-          height: 90,
-          marginLeft: 32,
-          marginRight: 24,
-          marginTop: 10,
-          marginBottom: 10,
+        <img src="/kl.jpg" alt="KL University Logo" style={{
+          height: 48, // reduced
+          width: 48,
+          marginLeft: 16,
+          marginRight: 16,
+          marginTop: 6,
+          marginBottom: 6,
           background: WHITE,
           borderRadius: "50%",
           boxShadow: "0 2px 8px rgba(183,28,28,0.08)",
-          objectFit: "contain"
+          objectFit: "cover"
         }} />
         <div style={{ flex: 1, textAlign: "center" }}>
           <h1 style={{
             margin: 0,
-            fontSize: 44,
+            fontSize: 28,
             letterSpacing: 2,
             fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.1em"
+            textTransform: "uppercase"
           }}>MARKMEE</h1>
           <div style={{
-            fontSize: 20,
+            fontSize: 14,
             letterSpacing: 1,
-            marginTop: 4,
+            marginTop: 2,
             fontWeight: 500
           }}>
-            Student Portal <span style={{
-              color: RED,
-              background: WHITE,
-              padding: "2px 8px",
-              borderRadius: 6,
-              fontWeight: 700
-            }}>DEPARTMENT OF AI&DS</span>
+            Student Portal
           </div>
         </div>
       </header>
@@ -884,6 +878,22 @@ export default function StudentPage() {
           </div>
         </div>
       )}
+
+      <footer
+        style={{
+          width: "100vw",
+          background: RED,
+          color: "#fff",
+          textAlign: "center",
+          padding: "8px 0 6px 0", // reduced
+          fontSize: 13,
+          fontWeight: 500,
+          letterSpacing: 1,
+          marginTop: 20,
+        }}
+      >
+        &copy; {new Date().getFullYear()} KL University | All Rights Reserved
+      </footer>
     </div>
   );
 }

@@ -9,6 +9,26 @@ export default function FacultyPage() {
   const [running, setRunning] = useState(false);
   const [downloadReady, setDownloadReady] = useState(false);
 
+  // Dark mode state
+  const [darkMode, setDarkMode] = useState(() =>
+    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  // Fullscreen QR state
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Toggle dark mode handler
+  const toggleDarkMode = () => setDarkMode(d => !d);
+
+  // Colors based on mode
+  const BG = darkMode ? "#181a1b" : "#fff";
+  const RED = "#b71c1c";
+  const WHITE = "#fff";
+  const TEXT = darkMode ? "#eee" : "#222";
+  const CARD = darkMode ? "#232526" : "#fff";
+  const BORDER = darkMode ? "#333" : "#b71c1c";
+  const SHADOW = darkMode ? "0 4px 32px rgba(40,40,40,0.4)" : "0 4px 32px rgba(183, 28, 28, 0.13)";
+
   // Get API URL based on environment
   const getApiUrl = () => {
     if (window.location.hostname.includes('.onrender.com')) {
@@ -76,23 +96,14 @@ export default function FacultyPage() {
     const fetchQR = async () => {
       try {
         const API_BASE_URL = getApiUrl();
-        console.log(`Fetching QR from: ${API_BASE_URL}/qr`);
-        
         const res = await fetch(`${API_BASE_URL}/qr`);
-        
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
-        
         const json = await res.json();
-        console.log("QR Response:", json);
         setQr(json);
       } catch (err) {
         console.error("Failed to fetch QR:", err);
-        
-        if (err.message.includes('Failed to fetch')) {
-          console.error("Network error - check if Flask API is accessible");
-        }
       }
     };
 
@@ -105,13 +116,20 @@ export default function FacultyPage() {
     };
   }, [running]);
 
-  // MAIN FACULTY DASHBOARD (after login) - Keep existing code
+  // Automatically exit fullscreen when time is up
+  useEffect(() => {
+    if (isFullScreen && timeLeft === 0) {
+      setIsFullScreen(false);
+    }
+  }, [isFullScreen, timeLeft]);
+
+  // MAIN FACULTY DASHBOARD (after login)
   return (
     <div
       style={{
         minHeight: "100vh",
         minWidth: "100vw",
-        background: "#fff",
+        background: BG,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -119,65 +137,72 @@ export default function FacultyPage() {
         fontFamily: "Segoe UI, Arial, sans-serif",
         margin: 0,
         padding: 0,
+        color: TEXT,
+        transition: "background 0.3s, color 0.3s"
       }}
     >
       <header
         style={{
           width: "100vw",
-          background: "#b71c1c",
-          color: "#fff",
-          padding: "0 0 0 0",
+          background: RED,
+          color: WHITE,
+          padding: "0",
           textAlign: "center",
           boxShadow: "0 2px 16px rgba(183, 28, 28, 0.13)",
           position: "relative",
-          minHeight: 90,
+          minHeight: 60,
           display: "flex",
           alignItems: "center",
         }}
       >
-        {/* AI&DS Department Label */}
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: 16,
-            background: "rgba(255, 255, 255, 0.15)",
-            color: "#fff",
-            padding: "4px 12px",
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: 1,
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-          }}
-        >
-          AI&DS
-        </div>
-        
         <img
-          src="/Lg.png"
+          src="/kl.jpg"
           alt="KL University Logo"
           style={{
-            height: 100,
-            marginLeft: 32,
-            marginRight: 24,
-            marginTop: 10,
-            marginBottom: 10,
+            height: 48,
+            width: 48,
+            marginLeft: 16,
+            marginRight: 16,
+            marginTop: 6,
+            marginBottom: 6,
             background: "#fff",
-            borderRadius: 12,
+            borderRadius: "50%",
             boxShadow: "0 2px 8px rgba(183,28,28,0.08)",
-            objectFit: "contain",
+            objectFit: "cover",
             display: "block",
           }}
         />
         <div style={{ flex: 1, textAlign: "center" }}>
-          <h1 style={{ margin: 0, fontSize: 44, letterSpacing: 2, fontWeight: 500, textTransform: "uppercase" }}>
-            attendu
+          <h1 style={{ margin: 0, fontSize: 28, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase" }}>
+            MARKMEE
           </h1>
-          <div style={{ fontSize: 20, letterSpacing: 1, marginTop: 4, fontWeight: 500 }}>
-            faculty portal - <span style={{ color: "#b71c1c", background: "#fff", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>KL University</span>
+          <div style={{ fontSize: 14, letterSpacing: 1, marginTop: 2, fontWeight: 500 }}>
+            faculty portal
           </div>
         </div>
+        <button
+          onClick={toggleDarkMode}
+          style={{
+            marginRight: 24,
+            background: darkMode ? "#333" : "#fff",
+            color: darkMode ? "#fff" : "#b71c1c",
+            border: `2px solid ${RED}`,
+            borderRadius: "50%",
+            width: 36,
+            height: 36,
+            fontSize: 18,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            transition: "background 0.2s, color 0.2s"
+          }}
+          title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {darkMode ? "🌙" : "☀️"}
+        </button>
       </header>
 
       <main
@@ -187,22 +212,25 @@ export default function FacultyPage() {
           alignItems: "center",
           justifyContent: "center",
           width: "100vw",
-          background: "#fff",
+          background: BG,
         }}
       >
         <div
           style={{
-            background: "#fff",
+            background: CARD,
             borderRadius: 20,
-            boxShadow: "0 4px 32px rgba(183, 28, 28, 0.13)",
+            boxShadow: SHADOW,
             padding: "48px 36px",
             minWidth: 340,
             maxWidth: 400,
             width: "100%",
             textAlign: "center",
+            color: TEXT,
+            border: `1.5px solid ${BORDER}`,
+            transition: "background 0.3s, color 0.3s"
           }}
         >
-          <h2 style={{ color: "#b71c1c", marginBottom: 24, fontWeight: 600 }}>
+          <h2 style={{ color: RED, marginBottom: 24, fontWeight: 600 }}>
             Attendance QR Code Display
           </h2>
 
@@ -210,7 +238,7 @@ export default function FacultyPage() {
             <>
               <label
                 style={{
-                  color: "#b71c1c",
+                  color: RED,
                   fontWeight: 500,
                   fontSize: 16,
                   marginBottom: 12,
@@ -231,7 +259,7 @@ export default function FacultyPage() {
                     fontSize: 16,
                     outline: "none",
                     width: 80,
-                    color: "#b71c1c",
+                    color: RED,
                     background: "#fff5f5",
                     marginTop: 8,
                   }}
@@ -241,7 +269,7 @@ export default function FacultyPage() {
                 onClick={startQR}
                 style={{
                   marginTop: 28,
-                  background: "#b71c1c",
+                  background: RED,
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
@@ -261,7 +289,7 @@ export default function FacultyPage() {
               <h3 style={{ color: "#4caf50", fontWeight: 600, marginBottom: 18, fontSize: 22 }}>
                 Time Expired!
               </h3>
-              <p style={{ color: "#b71c1c", marginBottom: 20, fontWeight: 500 }}>
+              <p style={{ color: RED, marginBottom: 20, fontWeight: 500 }}>
                 The attendance file is now available for download.
               </p>
               <button
@@ -290,7 +318,7 @@ export default function FacultyPage() {
                   setQr(null);
                 }}
                 style={{
-                  background: "#b71c1c",
+                  background: RED,
                   color: "#fff",
                   border: "none",
                   borderRadius: 8,
@@ -309,7 +337,7 @@ export default function FacultyPage() {
             <>
               <h3
                 style={{
-                  color: "#b71c1c",
+                  color: RED,
                   fontWeight: 600,
                   marginBottom: 18,
                   fontSize: 22,
@@ -319,23 +347,51 @@ export default function FacultyPage() {
               </h3>
               {qr ? (
                 <>
-                  <img
-                    src={qr.image}
-                    alt="QR Code"
-                    width="200"
-                    height="200"
-                    style={{
-                      marginTop: 10,
-                      marginBottom: 18,
-                      borderRadius: 12,
-                      border: "2px solid #b71c1c",
-                      background: "#fff5f5",
-                    }}
-                  />
+                  <div style={{ position: "relative", display: "inline-block" }}>
+                    <img
+                      src={qr.image}
+                      alt="QR Code"
+                      width="200"
+                      height="200"
+                      style={{
+                        marginTop: 10,
+                        marginBottom: 18,
+                        borderRadius: 12,
+                        border: "2px solid RED",
+                        background: "#fff5f5",
+                        display: "block"
+                      }}
+                    />
+                    <button
+                      onClick={() => setIsFullScreen(true)}
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        background: "#222",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: 36,
+                        height: 36,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2
+                      }}
+                      title="Full Screen QR"
+                    >
+                      ⛶
+                    </button>
+                  </div>
                   <div
                     style={{
                       background: "#fff5f5",
-                      color: "#b71c1c",
+                      color: RED,
                       borderRadius: 8,
                       padding: "10px 8px",
                       fontWeight: 500,
@@ -367,7 +423,7 @@ export default function FacultyPage() {
                 </>
               ) : (
                 <div>
-                  <p style={{ color: "#b71c1c", fontWeight: 500 }}>Loading QR...</p>
+                  <p style={{ color: RED, fontWeight: 500 }}>Loading QR...</p>
                   <p style={{ color: "#666", fontSize: 12, marginTop: 8 }}>
                     If QR doesn't load, check if Flask API is running and accessible
                   </p>
@@ -377,17 +433,84 @@ export default function FacultyPage() {
           )}
         </div>
       </main>
+      {/* Full Screen QR Overlay */}
+      {isFullScreen && qr && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 9999,
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "#000",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+          onClick={() => setIsFullScreen(false)}
+        >
+          <button
+            onClick={() => setIsFullScreen(false)}
+            style={{
+              position: "fixed",
+              top: 24,
+              right: 32,
+              background: "#fff",
+              color: "#b71c1c",
+              border: "none",
+              borderRadius: "50%",
+              width: 40,
+              height: 40,
+              fontSize: 22,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 10000
+            }}
+            title="Close Full Screen"
+          >
+            ×
+          </button>
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={qr.image}
+              alt="QR Code"
+              width={340}
+              height={340}
+              style={{
+                borderRadius: 18,
+                border: "4px solid #fff",
+                background: "#fff",
+                display: "block",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.25)"
+              }}
+            />
+          </div>
+        </div>
+      )}
       <footer
         style={{
           width: "100vw",
-          background: "#b71c1c",
+          background: RED,
           color: "#fff",
           textAlign: "center",
-          padding: "16px 0 10px 0",
-          fontSize: 16,
+          padding: "8px 0 6px 0",
+          fontSize: 13,
           fontWeight: 500,
           letterSpacing: 1,
-          marginTop: 40,
+          marginTop: 20,
         }}
       >
         &copy; {new Date().getFullYear()} KL University | All Rights Reserved
