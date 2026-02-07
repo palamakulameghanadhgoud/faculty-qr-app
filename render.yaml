@@ -6,7 +6,7 @@ services:
     startCommand: gunicorn qr_api:app
     envVars:
       - key: MONGODB_URI
-        value: mongodb+srv://megh:marco@vicecluster.4wafcsu.mongodb.net/?retryWrites=true&w=majority&appName=vicecluster
+        value:
       - key: DATABASE_NAME
         value: kl_university_attendance
       - key: STUDENTS_COLLECTION
